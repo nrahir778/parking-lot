@@ -13,12 +13,16 @@ export const BuzzerIndicator: React.FC<BuzzerIndicatorProps> = ({
   onTriggerPulse,
   onToggleAudio,
 }) => {
-  const { active, pulseCount, currentPulse, audioEnabled } = buzzerState;
+  const { active, pulseCount, currentPulse, audioEnabled, hardwareBuzzerOn } = buzzerState;
 
   return (
-    <div className="glass-panel rounded-2xl p-4 md:p-5 border border-slate-800/80 shadow-lg relative overflow-hidden">
+    <div className={`glass-panel rounded-2xl p-4 md:p-5 border transition-all duration-300 relative overflow-hidden ${
+      hardwareBuzzerOn
+        ? 'border-amber-500/50 bg-amber-950/[0.15] shadow-[0_0_25px_rgba(245,158,11,0.2)]'
+        : 'border-slate-800/80 shadow-lg'
+    }`}>
       {/* Background Strobe Flare when buzzer is active */}
-      {active && (
+      {(active || hardwareBuzzerOn) && (
         <div className="absolute inset-0 bg-amber-500/10 animate-pulse pointer-events-none transition-opacity duration-200" />
       )}
 
@@ -27,7 +31,7 @@ export const BuzzerIndicator: React.FC<BuzzerIndicatorProps> = ({
         <div className="flex items-center gap-3.5">
           <div className="relative">
             {/* Concentric Animated Sound Wave Rings */}
-            {active && (
+            {(active || hardwareBuzzerOn) && (
               <>
                 <div className="absolute -inset-2 rounded-full border border-amber-400/60 animate-buzzer-wave pointer-events-none" />
                 <div
@@ -43,13 +47,13 @@ export const BuzzerIndicator: React.FC<BuzzerIndicatorProps> = ({
 
             <div
               className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all duration-300 ${
-                active
+                active || hardwareBuzzerOn
                   ? 'bg-amber-500 text-slate-950 shadow-[0_0_25px_#f59e0b] scale-105'
                   : 'bg-slate-800/90 text-amber-400 border border-slate-700/60'
               }`}
             >
               <BellRing
-                className={`w-6 h-6 ${active ? 'animate-bounce' : ''}`}
+                className={`w-6 h-6 ${active || hardwareBuzzerOn ? 'animate-bounce' : ''}`}
               />
             </div>
           </div>
@@ -57,22 +61,28 @@ export const BuzzerIndicator: React.FC<BuzzerIndicatorProps> = ({
           <div>
             <div className="flex items-center gap-2">
               <h3 className="text-sm font-semibold text-white tracking-wide">
-                Common Piezo Buzzer
+                Common Piezo Buzzer (Pin D8)
               </h3>
               <span
                 className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full border uppercase transition-colors ${
-                  active
+                  hardwareBuzzerOn
+                    ? 'bg-amber-500/30 text-amber-200 border-amber-500/60 shadow-[0_0_12px_rgba(245,158,11,0.4)] animate-pulse'
+                    : active
                     ? 'bg-amber-500/20 text-amber-300 border-amber-500/50 shadow-[0_0_10px_rgba(245,158,11,0.3)]'
                     : 'bg-slate-800 text-slate-400 border-slate-700'
                 }`}
               >
-                {active ? `PULSING (${currentPulse}/${pulseCount})` : 'STANDBY'}
+                {hardwareBuzzerOn
+                  ? 'D8 ACTIVE (LOT FULL)'
+                  : active
+                  ? `PULSING (${currentPulse}/${pulseCount})`
+                  : 'STANDBY (OFF)'}
               </span>
             </div>
             <div className="text-xs text-slate-400 mt-0.5 flex items-center gap-2">
-              <span>Arduino Pattern Alert</span>
+              <span>Arduino Uno Pin D8</span>
               <span aria-hidden="true">·</span>
-              <span className="font-mono text-slate-400">PWM Pin Output</span>
+              <span className="font-mono text-slate-400">Triggered when all 3 slots occupied</span>
             </div>
           </div>
         </div>

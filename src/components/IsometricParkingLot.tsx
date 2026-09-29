@@ -1,16 +1,20 @@
 import React, { useState } from 'react';
-import { CameraView, SlotData } from '../types';
+import { CameraView, SlotData, GateState } from '../types';
 import { Car3D } from './Car3D';
-import { Compass, Eye, Maximize2, Minimize2, RotateCcw, Sparkles } from 'lucide-react';
+import { Compass, Eye, Maximize2, Minimize2, RotateCcw, Sparkles, Bell } from 'lucide-react';
 
 interface IsometricParkingLotProps {
   slots: SlotData[];
+  gateState?: GateState;
+  hardwareBuzzerOn?: boolean;
   onSlotClick?: (slotId: 1 | 2 | 3) => void;
   selectedSlotId?: number;
 }
 
 export const IsometricParkingLot: React.FC<IsometricParkingLotProps> = ({
   slots,
+  gateState = { angle: 0, status: 'OPEN' },
+  hardwareBuzzerOn = false,
   onSlotClick,
   selectedSlotId,
 }) => {
@@ -30,6 +34,8 @@ export const IsometricParkingLot: React.FC<IsometricParkingLotProps> = ({
     }
   };
 
+  const isGateClosed = gateState.angle >= 45 || gateState.status === 'CLOSED';
+
   return (
     <div className="relative w-full h-[520px] md:h-[580px] rounded-2xl overflow-hidden bg-gradient-to-b from-[#0b101d] via-[#090d18] to-[#060810] border border-slate-800/80 shadow-[0_20px_50px_rgba(0,0,0,0.7)] flex flex-col items-center justify-center p-4">
       {/* Background Grid Pattern & Ambient Radial Glow */}
@@ -41,7 +47,7 @@ export const IsometricParkingLot: React.FC<IsometricParkingLotProps> = ({
         <div className="flex items-center gap-2">
           <div className="px-3 py-1.5 rounded-lg glass-panel flex items-center gap-2 text-xs font-medium text-slate-300">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="font-semibold tracking-wide">3D DIGITAL TWIN</span>
+            <span className="font-semibold tracking-wide">3D PARKING TWIN</span>
           </div>
 
           <button
@@ -56,6 +62,14 @@ export const IsometricParkingLot: React.FC<IsometricParkingLotProps> = ({
             <Sparkles className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">Sensor Beams</span>
           </button>
+
+          {/* Hardware Buzzer Alert Tag if active */}
+          {hardwareBuzzerOn && (
+            <div className="px-3 py-1.5 rounded-lg bg-rose-500/20 text-rose-300 border border-rose-500/40 flex items-center gap-1.5 text-xs font-mono font-bold animate-pulse shadow-[0_0_12px_rgba(244,63,94,0.4)]">
+              <Bell className="w-3.5 h-3.5" />
+              <span>BUZZER D8: ON</span>
+            </div>
+          )}
         </div>
 
         {/* Camera Perspective Switcher */}
@@ -144,7 +158,7 @@ export const IsometricParkingLot: React.FC<IsometricParkingLotProps> = ({
         >
           {/* Main Parking Lot Concrete Base Platform (Slab with 3D Depth) */}
           <div
-            className="relative w-[540px] h-[340px] rounded-3xl preserve-3d transition-all duration-500"
+            className="relative w-[550px] h-[350px] rounded-3xl preserve-3d transition-all duration-500"
             style={{
               background: 'radial-gradient(ellipse at 50% 50%, #171f2f 0%, #0d121c 100%)',
               boxShadow: '0 30px 60px -12px rgba(0, 0, 0, 0.9), inset 0 2px 4px rgba(255,255,255,0.1), inset 0 -6px 12px rgba(0,0,0,0.8)',
@@ -152,37 +166,98 @@ export const IsometricParkingLot: React.FC<IsometricParkingLotProps> = ({
               transform: 'translateZ(0px)',
             }}
           >
-            {/* Slab Concrete Edge Side (3D extrusion illusion) */}
+            {/* Slab Concrete Edge Side */}
             <div
               className="absolute -bottom-3 inset-x-0 h-3 rounded-b-3xl bg-neutral-900 border-x-2 border-b-2 border-slate-800"
               style={{ transform: 'rotateX(-90deg) translateZ(0px)', transformOrigin: 'top' }}
             />
 
-            {/* Driveway Lane / Entrance Roadway with Chevrons */}
-            <div className="absolute bottom-0 inset-x-0 h-24 border-t-2 border-dashed border-slate-600/40 bg-gradient-to-t from-slate-900/60 to-transparent flex items-center justify-around px-8 pointer-events-none">
-              <div className="flex items-center gap-1 opacity-30">
-                <span className="text-xl text-white font-mono">›››</span>
-                <span className="text-xs font-mono tracking-widest text-slate-400 uppercase">ENTRY LANE</span>
+            {/* Driveway Lane / Entrance Roadway with MG995 Gate Servo Barrier */}
+            <div className="absolute bottom-0 inset-x-0 h-24 border-t-2 border-dashed border-slate-600/40 bg-gradient-to-t from-slate-900/60 to-transparent flex items-center justify-between px-6 pointer-events-none preserve-3d">
+              {/* ENTRY LANE WITH MG995 GATE BARRIER */}
+              <div className="relative flex items-center gap-3 preserve-3d">
+                {/* MG995 Servo Post */}
+                <div
+                  className="relative w-8 h-10 rounded-md bg-neutral-900 border border-slate-600 shadow-xl flex flex-col items-center justify-between py-1 preserve-3d"
+                  style={{ transform: 'translateZ(14px)' }}
+                >
+                  <div className="w-3 h-3 rounded-full bg-slate-700 border border-slate-500 flex items-center justify-center">
+                    <div className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
+                  </div>
+                  <span className="text-[6px] font-mono font-bold text-amber-400">MG995</span>
+                  <div
+                    className={`w-2.5 h-2.5 rounded-full ${
+                      isGateClosed
+                        ? 'bg-rose-500 shadow-[0_0_8px_#f43f5e] animate-pulse'
+                        : 'bg-emerald-400 shadow-[0_0_8px_#10b981]'
+                    }`}
+                  />
+                </div>
+
+                {/* Animated Gate Boom Arm */}
+                <div
+                  className="relative h-2.5 rounded-r-md transition-all duration-700 preserve-3d shadow-lg origin-left flex items-center"
+                  style={{
+                    width: '90px',
+                    transform: `translateZ(16px) ${
+                      isGateClosed ? 'rotateZ(0deg)' : 'rotateZ(-72deg)'
+                    }`,
+                    background: 'repeating-linear-gradient(45deg, #ef4444, #ef4444 8px, #ffffff 8px, #ffffff 16px)',
+                    boxShadow: isGateClosed
+                      ? '0 0 12px rgba(239,68,68,0.7)'
+                      : '0 0 6px rgba(16,185,129,0.5)',
+                  }}
+                >
+                  {/* Gate Arm Tip LED */}
+                  <div
+                    className={`absolute -right-1 w-2.5 h-2.5 rounded-full ${
+                      isGateClosed
+                        ? 'bg-rose-500 shadow-[0_0_10px_#f43f5e] animate-ping'
+                        : 'bg-emerald-400 shadow-[0_0_10px_#10b981]'
+                    }`}
+                  />
+                </div>
+
+                {/* Gate Status Stencil */}
+                <div className="flex flex-col ml-1 font-mono text-[9px]">
+                  <span
+                    className={`font-bold tracking-wider ${
+                      isGateClosed ? 'text-rose-400' : 'text-emerald-400'
+                    }`}
+                  >
+                    GATE: {gateState.angle}° ({gateState.status})
+                  </span>
+                  <span className="text-slate-400 text-[8px]">SERVO PIN D11</span>
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <div className="w-10 h-1 bg-amber-400/40 rounded-full" />
-                <div className="w-10 h-1 bg-amber-400/40 rounded-full" />
+
+              {/* Center Road Divider Chevrons */}
+              <div className="flex items-center gap-2 opacity-50">
+                <div className="w-8 h-1 bg-amber-400/60 rounded-full" />
+                <div className="w-8 h-1 bg-amber-400/60 rounded-full" />
               </div>
-              <div className="flex items-center gap-1 opacity-30">
-                <span className="text-xs font-mono tracking-widest text-slate-400 uppercase">EXIT LANE</span>
+
+              {/* EXIT LANE */}
+              <div className="flex items-center gap-1 opacity-40">
+                <span className="text-xs font-mono tracking-widest text-slate-400 uppercase">
+                  EXIT LANE
+                </span>
                 <span className="text-xl text-white font-mono">›››</span>
               </div>
             </div>
 
-            {/* Rear Barrier Wall / Walkway Curb with Safety Striping */}
+            {/* Rear Barrier Wall / Hardware Info Banner */}
             <div className="absolute top-0 inset-x-0 h-14 rounded-t-3xl bg-[#121927] border-b border-slate-700/60 flex items-center justify-between px-6 preserve-3d">
-              <div className="flex items-center gap-2 text-[11px] font-mono tracking-widest text-slate-400 font-semibold">
-                <div className="w-2.5 h-2.5 rounded-sm bg-amber-500/80 animate-pulse" />
-                <span>INTELLIGENT PARKING ZONE</span>
+              <div className="flex items-center gap-2 text-[11px] font-mono tracking-widest text-slate-300 font-semibold">
+                <div className="w-2.5 h-2.5 rounded-sm bg-cyan-400 animate-pulse" />
+                <span>ARDUINO UNO SMART PARKING</span>
               </div>
-              <div className="flex items-center gap-3">
-                <div className="w-14 h-1.5 rounded-full bg-gradient-to-r from-emerald-500 to-rose-500 opacity-60" />
-                <span className="text-[10px] font-mono text-slate-400">9600 BAUD</span>
+              <div className="flex items-center gap-3 text-[10px] font-mono text-slate-400">
+                <span>TRIG: D2,D4,D6</span>
+                <span aria-hidden="true">·</span>
+                <span>FSR: A0,A1,A2</span>
+                <span aria-hidden="true">·</span>
+                <span className="text-cyan-400">9600 BAUD</span>
               </div>
             </div>
 
@@ -221,7 +296,7 @@ export const IsometricParkingLot: React.FC<IsometricParkingLotProps> = ({
                       <span className="text-xs font-mono font-bold tracking-wider text-slate-300 bg-slate-900/80 px-2 py-0.5 rounded border border-white/10">
                         {slot.name}
                       </span>
-                      {/* Live Quick Status Pill */}
+                      {/* Live Quick Status */}
                       <span
                         className={`text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border transition-colors ${
                           isOccupied
@@ -229,11 +304,11 @@ export const IsometricParkingLot: React.FC<IsometricParkingLotProps> = ({
                             : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 shadow-[0_0_8px_rgba(16,185,129,0.3)]'
                         }`}
                       >
-                        {isOccupied ? 'OCCUPIED' : 'VACANT'}
+                        {isOccupied ? 'OCCUPIED' : 'AVAILABLE'}
                       </span>
                     </div>
 
-                    {/* Ultrasonic Overhead Sensor Gantry / Light Pillar */}
+                    {/* Ultrasonic Overhead Sensor Gantry (HC-SR04) */}
                     <div
                       className="absolute -top-12 left-1/2 -translate-x-1/2 preserve-3d flex flex-col items-center pointer-events-none z-30"
                       style={{ transform: 'translateZ(45px)' }}
@@ -269,7 +344,7 @@ export const IsometricParkingLot: React.FC<IsometricParkingLotProps> = ({
                       )}
                     </div>
 
-                    {/* Wheel Stop Curb Block at rear of parking stall */}
+                    {/* Wheel Stop Curb Block */}
                     <div
                       className="w-20 h-2.5 rounded-sm bg-neutral-800 border-t border-slate-500/60 shadow-md flex items-center justify-around px-1 z-10"
                       style={{ transform: 'translateZ(4px)' }}
@@ -293,19 +368,19 @@ export const IsometricParkingLot: React.FC<IsometricParkingLotProps> = ({
                             </span>
                           </div>
                           <span className="text-[10px] font-mono tracking-wider text-emerald-400/60 font-semibold uppercase">
-                            READY TO PARK
+                            BAY EMPTY
                           </span>
                         </div>
                       )}
                     </div>
 
-                    {/* Bottom Bay Front Barrier / Pressure Pad Indication */}
-                    <div className="w-full flex items-center justify-between px-2 pb-1 z-10 text-[10px] font-mono text-slate-400">
-                      <span className="tabular-nums">
+                    {/* Bottom Bay Telemetry: HC-SR04 Distance & FSR Reading */}
+                    <div className="w-full flex items-center justify-between px-2 pb-1 z-10 text-[10px] font-mono text-slate-300 bg-slate-950/60 rounded-md py-0.5 border border-white/5">
+                      <span className="tabular-nums font-semibold">
                         {slot.distance.toFixed(1)} cm
                       </span>
-                      <span className="tabular-nums">
-                        {slot.pressure} P
+                      <span className="tabular-nums font-semibold text-indigo-300">
+                        FSR: {slot.fsr ?? slot.pressure}
                       </span>
                     </div>
                   </div>
@@ -320,7 +395,7 @@ export const IsometricParkingLot: React.FC<IsometricParkingLotProps> = ({
       <div className="absolute bottom-3 left-4 right-4 flex items-center justify-between text-[11px] text-slate-400 pointer-events-none">
         <span className="flex items-center gap-1.5">
           <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
-          Click any slot to inspect or toggle demo override
+          Hardware Rule: Occupied if (Dist ≤ 3.0cm) AND (FSR ≥ 15)
         </span>
         <div className="flex items-center gap-3">
           <span className="flex items-center gap-1">

@@ -7,6 +7,8 @@ import {
   StopCircle,
   Download,
   Car,
+  Code,
+  AlertCircle,
 } from 'lucide-react';
 
 interface HeaderBarProps {
@@ -15,7 +17,9 @@ interface HeaderBarProps {
   onDisconnect: () => void;
   onToggleDemo: () => void;
   onExportSingleFileHtml: () => void;
+  onOpenArduinoGuide: () => void;
   isBrowserSupported: boolean;
+  portLabel?: string;
 }
 
 export const HeaderBar: React.FC<HeaderBarProps> = ({
@@ -24,7 +28,9 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
   onDisconnect,
   onToggleDemo,
   onExportSingleFileHtml,
+  onOpenArduinoGuide,
   isBrowserSupported,
+  portLabel,
 }) => {
   const isConnected = connectionMode === 'connected';
   const isDemo = connectionMode === 'demo';
@@ -42,12 +48,12 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
             SmartPark 3D
           </span>
           <span className="text-[11px] font-mono text-slate-400">
-            3-Slot Telemetry System · Arduino Uno @ 9600
+            Arduino Uno Telemetry · 9600 Baud · Win 11
           </span>
         </div>
       </div>
 
-      {/* Zone 2: System Status Indicator (Clean typography, no pill sandwiches) */}
+      {/* Zone 2: System Status Indicator */}
       <div className="hidden lg:flex items-center gap-3 text-xs text-slate-400 font-mono">
         <div className="flex items-center gap-2">
           <span
@@ -63,12 +69,12 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
           />
           <span className="text-slate-300 font-medium">
             {isConnected
-              ? 'ARDUINO UNO CONNECTED'
+              ? `LIVE HARDWARE: ${portLabel || 'ARDUINO UNO'}`
               : isDemo
-              ? 'SIMULATED DEMO ACTIVE'
+              ? 'SIMULATED DEMO ACTIVE (NOT REAL HARDWARE)'
               : isConnecting
               ? 'CONNECTING VIA WEB SERIAL...'
-              : 'OFFLINE / DISCONNECTED'}
+              : 'OFFLINE / AWAITING ARDUINO'}
           </span>
         </div>
         <span aria-hidden="true" className="text-slate-600">·</span>
@@ -79,6 +85,16 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
 
       {/* Zone 3: Primary Action Controls */}
       <div className="flex items-center flex-wrap gap-2.5">
+        {/* Arduino Firmware & Wiring Guide Button */}
+        <button
+          onClick={onOpenArduinoGuide}
+          className="px-3 py-1.5 rounded-xl glass-panel text-cyan-300 hover:text-white border-cyan-500/30 hover:border-cyan-500/50 text-xs font-mono flex items-center gap-1.5 transition-colors whitespace-nowrap"
+          title="View Arduino Uno code (.ino), pin diagram, and Windows 11 setup guide"
+        >
+          <Code className="w-3.5 h-3.5 text-cyan-400" />
+          <span>Arduino Code</span>
+        </button>
+
         {/* Connect / Disconnect Buttons */}
         {isConnected ? (
           <button
@@ -95,12 +111,12 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
             className="px-4 py-1.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-semibold font-mono flex items-center gap-1.5 transition-all shadow-[0_0_15px_rgba(6,182,212,0.3)] disabled:opacity-50 whitespace-nowrap"
             title={
               !isBrowserSupported
-                ? 'Web Serial requires Chrome or Edge desktop'
-                : 'Request Web Serial port at 9600 baud'
+                ? 'Web Serial requires Chrome or Edge on Windows 11'
+                : 'Select COM port and connect to Arduino Uno at 9600 baud'
             }
           >
             <Usb className="w-3.5 h-3.5" />
-            <span>{isConnecting ? 'Connecting...' : 'Connect Arduino'}</span>
+            <span>{isConnecting ? 'Opening COM...' : 'Connect Arduino'}</span>
           </button>
         )}
 
@@ -112,7 +128,7 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
               ? 'bg-amber-500/20 text-amber-300 border-amber-500/50 shadow-[0_0_12px_rgba(245,158,11,0.2)]'
               : 'glass-panel text-slate-300 hover:text-white border-slate-700/80 hover:border-slate-600'
           }`}
-          title="Toggle sensor simulator with traffic cycles"
+          title="Toggle sensor simulator (for testing when Arduino is not plugged in)"
         >
           {isDemo ? (
             <>

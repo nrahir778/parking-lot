@@ -1,11 +1,11 @@
 import React from 'react';
 import { SlotData } from '../types';
-import { Car, Gauge, Radio, Scale, ShieldCheck, ShieldAlert } from 'lucide-react';
+import { Car, Radio, Scale, ShieldCheck, ShieldAlert, Check, X } from 'lucide-react';
 
 interface SlotCardProps {
   slot: SlotData;
   onToggleStatus: (id: 1 | 2 | 3) => void;
-  onUpdateSensorValues?: (id: 1 | 2 | 3, distance: number, pressure: number) => void;
+  onUpdateSensorValues?: (id: 1 | 2 | 3, distance: number, fsr: number) => void;
   isDemoMode: boolean;
 }
 
@@ -17,11 +17,24 @@ export const SlotCard: React.FC<SlotCardProps> = ({
 }) => {
   const isOccupied = slot.status === 'OCCUPIED';
 
-  // Distance range: 0 - 50cm (under 10cm is considered occupied / close)
-  const distPercent = Math.min(100, Math.max(0, (slot.distance / 50) * 100));
+  // Hardware pin mapping for each slot
+  const pinInfo = {
+    1: { trig: 'D2', echo: 'D3', fsrPin: 'A0' },
+    2: { trig: 'D4', echo: 'D5', fsrPin: 'A1' },
+    3: { trig: 'D6', echo: 'D7', fsrPin: 'A2' },
+  }[slot.id];
 
-  // Pressure range: 0 - 1023 (above 200 is considered weight detected)
-  const pressPercent = Math.min(100, Math.max(0, (slot.pressure / 1023) * 100));
+  // Hardware conditions:
+  // Occupied if: Distance <= 3.0 cm AND FSR >= 15
+  const isDistSatisfied = slot.distance <= 3.0;
+  const fsrValue = slot.fsr ?? slot.pressure;
+  const isFsrSatisfied = fsrValue >= 15;
+
+  // Percentage for progress display
+  // For distance: 0 - 50 cm
+  const distPercent = Math.min(100, Math.max(0, (slot.distance / 50) * 100));
+  // For FSR: 0 - 1023
+  const fsrPercent = Math.min(100, Math.max(0, (fsrValue / 1023) * 100));
 
   return (
     <div
@@ -40,7 +53,7 @@ export const SlotCard: React.FC<SlotCardProps> = ({
         }`}
       />
 
-      {/* Header: Slot Name, Car Plate, Status Badge */}
+      {/* Header: Slot Name, Pinout, Status Badge */}
       <div>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
@@ -54,13 +67,18 @@ export const SlotCard: React.FC<SlotCardProps> = ({
               {slot.id}
             </div>
             <div>
-              <h4 className="text-base font-bold text-white tracking-wide">
-                {slot.name}
+              <h4 className="text-base font-bold text-white tracking-wide flex items-center gap-2">
+                <span>{slot.name}</span>
+                {slot.hasHardwareReading && (
+                  <span className="text-[9px] font-mono font-semibold px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">
+                    LIVE HW
+                  </span>
+                )}
               </h4>
               <div className="text-[11px] text-slate-400 font-mono flex items-center gap-1.5">
-                <span>Bay #{slot.id}</span>
+                <span>TRIG {pinInfo.trig} / ECHO {pinInfo.echo}</span>
                 <span aria-hidden="true">·</span>
-                <span>{slot.car.modelName}</span>
+                <span>FSR {pinInfo.fsrPin}</span>
               </div>
             </div>
           </div>
@@ -87,16 +105,16 @@ export const SlotCard: React.FC<SlotCardProps> = ({
           </div>
         </div>
 
-        {/* Dual Telemetry Gauges: Distance & Pressure */}
-        <div className="mt-5 space-y-4">
-          {/* Ultrasonic Distance Gauge */}
+        {/* Dual Telemetry Gauges: Distance & FSR Sensor */}
+        <div className="mt-4 space-y-3.5">
+          {/* 1. HC-SR04 Ultrasonic Distance Gauge */}
           <div className="bg-slate-900/70 rounded-xl p-3 border border-slate-800/80">
-            <div className="flex items-center justify-between text-xs mb-1.5">
+            <div className="flex items-center justify-between text-xs mb-1">
               <span className="text-slate-400 flex items-center gap-1.5 font-medium">
                 <Radio className="w-3.5 h-3.5 text-cyan-400" />
-                Ultrasonic Distance
+                HC-SR04 Distance
               </span>
-              <span className="font-mono font-bold text-slate-200 tabular-nums text-sm">
+              <span className="font-mono font-bold text-slate-100 tabular-nums text-sm">
                 {slot.distance.toFixed(1)}{' '}
                 <span className="text-xs text-slate-500 font-normal">cm</span>
               </span>
@@ -106,32 +124,42 @@ export const SlotCard: React.FC<SlotCardProps> = ({
             <div className="w-full h-2 rounded-full bg-slate-800 overflow-hidden relative">
               <div
                 className={`h-full transition-all duration-500 rounded-full ${
-                  slot.distance < 10
+                  isDistSatisfied
                     ? 'bg-rose-500 shadow-[0_0_8px_#f43f5e]'
-                    : slot.distance < 20
-                    ? 'bg-amber-400 shadow-[0_0_8px_#fbbf24]'
+                    : slot.distance < 10
+                    ? 'bg-amber-400'
                     : 'bg-emerald-500 shadow-[0_0_8px_#10b981]'
                 }`}
                 style={{ width: `${distPercent}%` }}
               />
             </div>
 
-            <div className="flex justify-between text-[10px] text-slate-400 font-mono mt-1">
-              <span>0 cm (Close)</span>
-              <span>Threshold: 10 cm</span>
-              <span>50 cm</span>
+            {/* Condition check indicator */}
+            <div className="flex justify-between items-center text-[10px] text-slate-400 font-mono mt-1.5">
+              <span className="flex items-center gap-1">
+                {isDistSatisfied ? (
+                  <span className="text-rose-400 font-semibold flex items-center gap-0.5">
+                    <Check className="w-3 h-3" /> Dist ≤ 3 cm Met
+                  </span>
+                ) : (
+                  <span className="text-slate-400 flex items-center gap-0.5">
+                    <X className="w-3 h-3 text-slate-500" /> Dist &gt; 3 cm
+                  </span>
+                )}
+              </span>
+              <span className="text-slate-400">Target: ≤ 3.0 cm</span>
             </div>
           </div>
 
-          {/* Pressure Sensor Gauge */}
+          {/* 2. FSR Force Sensor Gauge */}
           <div className="bg-slate-900/70 rounded-xl p-3 border border-slate-800/80">
-            <div className="flex items-center justify-between text-xs mb-1.5">
+            <div className="flex items-center justify-between text-xs mb-1">
               <span className="text-slate-400 flex items-center gap-1.5 font-medium">
                 <Scale className="w-3.5 h-3.5 text-indigo-400" />
-                Pressure Sensor (ADC)
+                FSR Force Reading ({pinInfo.fsrPin})
               </span>
-              <span className="font-mono font-bold text-slate-200 tabular-nums text-sm">
-                {slot.pressure}{' '}
+              <span className="font-mono font-bold text-slate-100 tabular-nums text-sm">
+                {fsrValue}{' '}
                 <span className="text-xs text-slate-500 font-normal">/ 1023</span>
               </span>
             </div>
@@ -140,53 +168,79 @@ export const SlotCard: React.FC<SlotCardProps> = ({
             <div className="w-full h-2 rounded-full bg-slate-800 overflow-hidden relative">
               <div
                 className={`h-full transition-all duration-500 rounded-full ${
-                  slot.pressure > 250
+                  isFsrSatisfied
                     ? 'bg-rose-500 shadow-[0_0_8px_#f43f5e]'
                     : 'bg-slate-600'
                 }`}
-                style={{ width: `${pressPercent}%` }}
+                style={{ width: `${fsrPercent}%` }}
               />
             </div>
 
-            <div className="flex justify-between text-[10px] text-slate-400 font-mono mt-1">
-              <span>0 (No load)</span>
-              <span>Active Threshold: 200</span>
-              <span>1023</span>
+            {/* Condition check indicator */}
+            <div className="flex justify-between items-center text-[10px] text-slate-400 font-mono mt-1.5">
+              <span className="flex items-center gap-1">
+                {isFsrSatisfied ? (
+                  <span className="text-rose-400 font-semibold flex items-center gap-0.5">
+                    <Check className="w-3 h-3" /> FSR ≥ 15 Met
+                  </span>
+                ) : (
+                  <span className="text-slate-400 flex items-center gap-0.5">
+                    <X className="w-3 h-3 text-slate-500" /> FSR &lt; 15
+                  </span>
+                )}
+              </span>
+              <span className="text-slate-400">Target: ≥ 15</span>
             </div>
           </div>
+        </div>
+
+        {/* Dual Condition Summary Result */}
+        <div className="mt-3 p-2 rounded-lg bg-slate-900/40 border border-slate-800 text-[10px] font-mono flex items-center justify-between text-slate-400">
+          <span>Logic Status:</span>
+          <span
+            className={`font-semibold ${
+              isOccupied ? 'text-rose-400' : 'text-emerald-400'
+            }`}
+          >
+            {isDistSatisfied && isFsrSatisfied
+              ? 'Both conditions satisfied'
+              : !isDistSatisfied && !isFsrSatisfied
+              ? 'Neither condition satisfied'
+              : !isDistSatisfied
+              ? 'Awaiting vehicle proximity'
+              : 'Awaiting weight on FSR'}
+          </span>
         </div>
       </div>
 
       {/* Interactive Controls & Slot Action Footer */}
-      <div className="mt-5 pt-3 border-t border-slate-800/80 flex flex-col gap-2">
-        <div className="flex items-center justify-between">
-          <button
-            onClick={() => onToggleStatus(slot.id)}
-            className={`w-full py-2 px-3 rounded-xl text-xs font-semibold tracking-wide transition-all flex items-center justify-center gap-2 border ${
-              isOccupied
-                ? 'bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border-rose-500/30'
-                : 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
-            }`}
-          >
-            <Car className="w-3.5 h-3.5" />
-            <span>{isOccupied ? 'Vacate Slot' : 'Park Vehicle'}</span>
-          </button>
-        </div>
+      <div className="mt-4 pt-3 border-t border-slate-800/80 flex flex-col gap-2">
+        <button
+          onClick={() => onToggleStatus(slot.id)}
+          className={`w-full py-2 px-3 rounded-xl text-xs font-semibold tracking-wide transition-all flex items-center justify-center gap-2 border ${
+            isOccupied
+              ? 'bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border-rose-500/30'
+              : 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+          }`}
+        >
+          <Car className="w-3.5 h-3.5" />
+          <span>{isOccupied ? 'Simulate Vacate' : 'Simulate Park (≤3cm & ≥15)'}</span>
+        </button>
 
-        {/* Demo Mode Manual Range Sliders for Quick Testing */}
+        {/* Demo Mode Manual Range Sliders for Testing */}
         {isDemoMode && onUpdateSensorValues && (
           <div className="mt-1 pt-2 border-t border-slate-800/50 space-y-1.5 text-[11px] text-slate-400">
             <div className="flex items-center justify-between">
               <span>Simulate Dist:</span>
               <input
                 type="range"
-                min="1"
+                min="0.5"
                 max="50"
                 step="0.5"
                 value={slot.distance}
                 onChange={(e) => {
                   const newDist = parseFloat(e.target.value);
-                  onUpdateSensorValues(slot.id, newDist, slot.pressure);
+                  onUpdateSensorValues(slot.id, newDist, fsrValue);
                 }}
                 className="w-28 h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-cyan-400"
               />
@@ -196,21 +250,21 @@ export const SlotCard: React.FC<SlotCardProps> = ({
             </div>
 
             <div className="flex items-center justify-between">
-              <span>Simulate Press:</span>
+              <span>Simulate FSR:</span>
               <input
                 type="range"
                 min="0"
-                max="1023"
-                step="20"
-                value={slot.pressure}
+                max="1000"
+                step="10"
+                value={fsrValue}
                 onChange={(e) => {
-                  const newPress = parseInt(e.target.value, 10);
-                  onUpdateSensorValues(slot.id, slot.distance, newPress);
+                  const newFsr = parseInt(e.target.value, 10);
+                  onUpdateSensorValues(slot.id, slot.distance, newFsr);
                 }}
                 className="w-28 h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-indigo-400"
               />
               <span className="font-mono text-slate-300 w-10 text-right">
-                {slot.pressure}
+                {fsrValue}
               </span>
             </div>
           </div>
