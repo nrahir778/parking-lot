@@ -1,0 +1,122 @@
+@import "tailwindcss";
+
+@layer utilities {
+  .preserve-3d {
+    transform-style: preserve-3d;
+  }
+  .perspective-1000 {
+    perspective: 1000px;
+  }
+  .perspective-1600 {
+    perspective: 1600px;
+  }
+  .backface-hidden {
+    backface-visibility: hidden;
+  }
+}
+
+/* Custom 3D Parking Lot Styles */
+.parking-scene {
+  transform-style: preserve-3d;
+  transition: transform 0.6s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.isometric-view {
+  transform: rotateX(56deg) rotateZ(-30deg) translateZ(0);
+}
+
+.topdown-view {
+  transform: rotateX(0deg) rotateZ(0deg) scale(0.92);
+}
+
+.driver-view {
+  transform: rotateX(70deg) rotateZ(-12deg) scale(1.05);
+}
+
+/* 3D Car animations */
+@keyframes carEnter {
+  0% {
+    transform: translateY(220px) translateZ(0) rotateY(0deg) scale(0.9);
+    opacity: 0;
+  }
+  40% {
+    opacity: 1;
+  }
+  75% {
+    transform: translateY(-8px) translateZ(2px) rotateY(0deg) scale(1);
+  }
+  88% {
+    transform: translateY(4px) translateZ(-1px) rotateY(0deg) scale(1);
+  }
+  100% {
+    transform: translateY(0px) translateZ(0) rotateY(0deg) scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes carExit {
+  0% {
+    transform: translateY(0px) translateZ(0) scale(1);
+    opacity: 1;
+  }
+  30% {
+    transform: translateY(30px) translateZ(0) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(240px) translateZ(0) scale(0.85);
+    opacity: 0;
+  }
+}
+
+@keyframes headlightFlash {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; filter: drop-shadow(0 0 12px rgba(254, 240, 138, 0.9)); }
+}
+
+@keyframes buzzerPulseWave {
+  0% {
+    transform: scale(0.85);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1.7);
+    opacity: 0;
+  }
+}
+
+.animate-buzzer-wave {
+  animation: buzzerPulseWave 0.75s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+}
+
+/* Glassmorphism panel styling */
+.glass-panel {
+  background: rgba(15, 23, 42, 0.75);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.glass-panel-elevated {
+  background: rgba(20, 29, 51, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 12px 36px -8px rgba(0, 0, 0, 0.6);
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.5);
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(100, 116, 139, 0.4);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.6);
+}
