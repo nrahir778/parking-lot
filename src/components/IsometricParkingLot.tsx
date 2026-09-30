@@ -9,6 +9,7 @@ interface IsometricParkingLotProps {
   hardwareBuzzerOn?: boolean;
   onSlotClick?: (slotId: 1 | 2 | 3) => void;
   selectedSlotId?: number;
+  isLightMode?: boolean;
 }
 
 export const IsometricParkingLot: React.FC<IsometricParkingLotProps> = ({
@@ -17,6 +18,7 @@ export const IsometricParkingLot: React.FC<IsometricParkingLotProps> = ({
   hardwareBuzzerOn = false,
   onSlotClick,
   selectedSlotId,
+  isLightMode = false,
 }) => {
   const [cameraView, setCameraView] = useState<CameraView>('isometric');
   const [zoom, setZoom] = useState(1);
@@ -37,25 +39,46 @@ export const IsometricParkingLot: React.FC<IsometricParkingLotProps> = ({
   const isGateClosed = gateState.angle >= 45 || gateState.status === 'CLOSED';
 
   return (
-    <div className="relative w-full h-[520px] md:h-[580px] rounded-2xl overflow-hidden bg-gradient-to-b from-[#0b101d] via-[#090d18] to-[#060810] border border-slate-800/80 shadow-[0_20px_50px_rgba(0,0,0,0.7)] flex flex-col items-center justify-center p-4">
-      {/* Background Grid Pattern & Ambient Radial Glow */}
-      <div className="absolute inset-0 bg-[linear-gradient(to_right,#1e293b15_1px,transparent_1px),linear-gradient(to_bottom,#1e293b15_1px,transparent_1px)] bg-[size:32px_32px] pointer-events-none" />
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[450px] bg-cyan-500/[0.03] rounded-full blur-[120px] pointer-events-none" />
+    <div
+      className={`relative w-full h-[520px] md:h-[580px] rounded-2xl overflow-hidden border shadow-xl flex flex-col items-center justify-center p-4 transition-colors duration-500 ${
+        isLightMode
+          ? 'bg-gradient-to-b from-slate-100 via-slate-200 to-slate-300 border-slate-300/80 shadow-slate-300/50'
+          : 'bg-gradient-to-b from-[#0b101d] via-[#090d18] to-[#060810] border-slate-800/80 shadow-[0_20px_50px_rgba(0,0,0,0.7)]'
+      }`}
+    >
+      {/* Background Grid Pattern */}
+      <div
+        className={`absolute inset-0 bg-[size:32px_32px] pointer-events-none ${
+          isLightMode
+            ? 'bg-[linear-gradient(to_right,#0000000a_1px,transparent_1px),linear-gradient(to_bottom,#0000000a_1px,transparent_1px)]'
+            : 'bg-[linear-gradient(to_right,#1e293b15_1px,transparent_1px),linear-gradient(to_bottom,#1e293b15_1px,transparent_1px)]'
+        }`}
+      />
 
       {/* Floating Control Bar for Camera & Display Modes */}
       <div className="absolute top-4 left-4 right-4 z-20 flex flex-wrap items-center justify-between gap-3 pointer-events-auto">
         <div className="flex items-center gap-2">
-          <div className="px-3 py-1.5 rounded-lg glass-panel flex items-center gap-2 text-xs font-medium text-slate-300">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="font-semibold tracking-wide">3D PARKING TWIN</span>
+          <div
+            className={`px-3 py-1.5 rounded-lg flex items-center gap-2 text-xs font-medium border shadow-xs ${
+              isLightMode
+                ? 'bg-white/90 text-slate-800 border-slate-300'
+                : 'glass-panel text-slate-300 border-slate-700'
+            }`}
+          >
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            <span className="font-semibold tracking-wide">3D PARKING YARD</span>
           </div>
 
           <button
             onClick={() => setShowSensorRays(!showSensorRays)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 border shadow-xs ${
               showSensorRays
-                ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-[0_0_12px_rgba(6,182,212,0.2)]'
-                : 'glass-panel text-slate-400 hover:text-slate-200'
+                ? isLightMode
+                  ? 'bg-cyan-600 text-white border-cyan-700'
+                  : 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40 shadow-[0_0_12px_rgba(6,182,212,0.2)]'
+                : isLightMode
+                ? 'bg-white/80 text-slate-600 hover:text-slate-900 border-slate-300'
+                : 'glass-panel text-slate-400 hover:text-slate-200 border-slate-700'
             }`}
             title="Toggle Sensor Ultrasonic Distance Beams"
           >
@@ -65,7 +88,7 @@ export const IsometricParkingLot: React.FC<IsometricParkingLotProps> = ({
 
           {/* Hardware Buzzer Alert Tag if active */}
           {hardwareBuzzerOn && (
-            <div className="px-3 py-1.5 rounded-lg bg-rose-500/20 text-rose-300 border border-rose-500/40 flex items-center gap-1.5 text-xs font-mono font-bold animate-pulse shadow-[0_0_12px_rgba(244,63,94,0.4)]">
+            <div className="px-3 py-1.5 rounded-lg bg-rose-500/20 text-rose-500 border border-rose-500/40 flex items-center gap-1.5 text-xs font-mono font-bold animate-pulse shadow-sm">
               <Bell className="w-3.5 h-3.5" />
               <span>BUZZER D8: ON</span>
             </div>
@@ -73,12 +96,20 @@ export const IsometricParkingLot: React.FC<IsometricParkingLotProps> = ({
         </div>
 
         {/* Camera Perspective Switcher */}
-        <div className="flex items-center gap-1 p-1 rounded-xl glass-panel">
+        <div
+          className={`flex items-center gap-1 p-1 rounded-xl border shadow-xs ${
+            isLightMode ? 'bg-white/90 border-slate-300' : 'glass-panel border-slate-700'
+          }`}
+        >
           <button
             onClick={() => setCameraView('isometric')}
             className={`px-3 py-1 text-xs font-medium rounded-lg transition-colors flex items-center gap-1.5 ${
               cameraView === 'isometric'
-                ? 'bg-slate-700/80 text-white shadow-sm'
+                ? isLightMode
+                  ? 'bg-slate-800 text-white shadow-xs'
+                  : 'bg-slate-700/80 text-white shadow-sm'
+                : isLightMode
+                ? 'text-slate-600 hover:text-slate-900'
                 : 'text-slate-400 hover:text-slate-200'
             }`}
           >
@@ -90,7 +121,11 @@ export const IsometricParkingLot: React.FC<IsometricParkingLotProps> = ({
             onClick={() => setCameraView('topdown')}
             className={`px-3 py-1 text-xs font-medium rounded-lg transition-colors flex items-center gap-1.5 ${
               cameraView === 'topdown'
-                ? 'bg-slate-700/80 text-white shadow-sm'
+                ? isLightMode
+                  ? 'bg-slate-800 text-white shadow-xs'
+                  : 'bg-slate-700/80 text-white shadow-sm'
+                : isLightMode
+                ? 'text-slate-600 hover:text-slate-900'
                 : 'text-slate-400 hover:text-slate-200'
             }`}
           >
@@ -102,26 +137,36 @@ export const IsometricParkingLot: React.FC<IsometricParkingLotProps> = ({
             onClick={() => setCameraView('driver')}
             className={`px-3 py-1 text-xs font-medium rounded-lg transition-colors flex items-center gap-1.5 ${
               cameraView === 'driver'
-                ? 'bg-slate-700/80 text-white shadow-sm'
+                ? isLightMode
+                  ? 'bg-slate-800 text-white shadow-xs'
+                  : 'bg-slate-700/80 text-white shadow-sm'
+                : isLightMode
+                ? 'text-slate-600 hover:text-slate-900'
                 : 'text-slate-400 hover:text-slate-200'
             }`}
           >
             <span>Driver View</span>
           </button>
 
-          <div className="w-px h-4 bg-slate-700/80 mx-1" />
+          <div
+            className={`w-px h-4 mx-1 ${isLightMode ? 'bg-slate-300' : 'bg-slate-700/80'}`}
+          />
 
           {/* Zoom controls */}
           <button
             onClick={() => setZoom((z) => Math.min(1.3, z + 0.1))}
-            className="p-1.5 text-slate-400 hover:text-white rounded-md transition-colors"
+            className={`p-1.5 rounded-md transition-colors ${
+              isLightMode ? 'text-slate-600 hover:text-slate-900' : 'text-slate-400 hover:text-white'
+            }`}
             title="Zoom In"
           >
             <Maximize2 className="w-3.5 h-3.5" />
           </button>
           <button
             onClick={() => setZoom((z) => Math.max(0.75, z - 0.1))}
-            className="p-1.5 text-slate-400 hover:text-white rounded-md transition-colors"
+            className={`p-1.5 rounded-md transition-colors ${
+              isLightMode ? 'text-slate-600 hover:text-slate-900' : 'text-slate-400 hover:text-white'
+            }`}
             title="Zoom Out"
           >
             <Minimize2 className="w-3.5 h-3.5" />
@@ -131,7 +176,9 @@ export const IsometricParkingLot: React.FC<IsometricParkingLotProps> = ({
               setZoom(1);
               setCameraView('isometric');
             }}
-            className="p-1.5 text-slate-400 hover:text-white rounded-md transition-colors"
+            className={`p-1.5 rounded-md transition-colors ${
+              isLightMode ? 'text-slate-600 hover:text-slate-900' : 'text-slate-400 hover:text-white'
+            }`}
             title="Reset View"
           >
             <RotateCcw className="w-3.5 h-3.5" />
@@ -139,7 +186,7 @@ export const IsometricParkingLot: React.FC<IsometricParkingLotProps> = ({
         </div>
       </div>
 
-      {/* 3D Scene Viewport with CSS 3D Perspective */}
+      {/* 3D Scene Viewport */}
       <div
         className="w-full h-full flex items-center justify-center perspective-1600 overflow-visible"
         style={{ perspectiveOrigin: '50% 45%' }}
@@ -156,32 +203,39 @@ export const IsometricParkingLot: React.FC<IsometricParkingLotProps> = ({
             }`,
           }}
         >
-          {/* Main Parking Lot Concrete Base Platform (Slab with 3D Depth) */}
+          {/* Main Parking Yard Ground Platform (Paved Asphalt / Concrete Slab) */}
           <div
             className="relative w-[550px] h-[350px] rounded-3xl preserve-3d transition-all duration-500"
             style={{
-              background: 'radial-gradient(ellipse at 50% 50%, #171f2f 0%, #0d121c 100%)',
-              boxShadow: '0 30px 60px -12px rgba(0, 0, 0, 0.9), inset 0 2px 4px rgba(255,255,255,0.1), inset 0 -6px 12px rgba(0,0,0,0.8)',
-              border: '2px solid rgba(255, 255, 255, 0.08)',
+              background: isLightMode
+                ? 'radial-gradient(ellipse at 50% 50%, #334155 0%, #1e293b 100%)'
+                : 'radial-gradient(ellipse at 50% 50%, #171f2f 0%, #0d121c 100%)',
+              boxShadow: isLightMode
+                ? '0 30px 60px -10px rgba(71, 85, 105, 0.4), inset 0 2px 4px rgba(255,255,255,0.2), 0 0 0 3px #94a3b8'
+                : '0 30px 60px -12px rgba(0, 0, 0, 0.9), inset 0 2px 4px rgba(255,255,255,0.1), 0 0 0 2px rgba(255,255,255,0.08)',
               transform: 'translateZ(0px)',
             }}
           >
-            {/* Slab Concrete Edge Side */}
+            {/* 3D Foundation Edge */}
             <div
-              className="absolute -bottom-3 inset-x-0 h-3 rounded-b-3xl bg-neutral-900 border-x-2 border-b-2 border-slate-800"
+              className={`absolute -bottom-3 inset-x-0 h-3 rounded-b-3xl border-x-2 border-b-2 ${
+                isLightMode
+                  ? 'bg-slate-600 border-slate-700'
+                  : 'bg-neutral-900 border-slate-800'
+              }`}
               style={{ transform: 'rotateX(-90deg) translateZ(0px)', transformOrigin: 'top' }}
             />
 
             {/* Driveway Lane / Entrance Roadway with MG995 Gate Servo Barrier */}
-            <div className="absolute bottom-0 inset-x-0 h-24 border-t-2 border-dashed border-slate-600/40 bg-gradient-to-t from-slate-900/60 to-transparent flex items-center justify-between px-6 pointer-events-none preserve-3d">
+            <div className="absolute bottom-0 inset-x-0 h-24 border-t-2 border-dashed border-slate-400/50 bg-gradient-to-t from-black/20 to-transparent flex items-center justify-between px-6 pointer-events-none preserve-3d">
               {/* ENTRY LANE WITH MG995 GATE BARRIER */}
               <div className="relative flex items-center gap-3 preserve-3d">
                 {/* MG995 Servo Post */}
                 <div
-                  className="relative w-8 h-10 rounded-md bg-neutral-900 border border-slate-600 shadow-xl flex flex-col items-center justify-between py-1 preserve-3d"
+                  className="relative w-8 h-10 rounded-md bg-neutral-900 border border-slate-500 shadow-xl flex flex-col items-center justify-between py-1 preserve-3d"
                   style={{ transform: 'translateZ(14px)' }}
                 >
-                  <div className="w-3 h-3 rounded-full bg-slate-700 border border-slate-500 flex items-center justify-center">
+                  <div className="w-3 h-3 rounded-full bg-slate-700 border border-slate-400 flex items-center justify-center">
                     <div className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
                   </div>
                   <span className="text-[6px] font-mono font-bold text-amber-400">MG995</span>
@@ -202,7 +256,8 @@ export const IsometricParkingLot: React.FC<IsometricParkingLotProps> = ({
                     transform: `translateZ(16px) ${
                       isGateClosed ? 'rotateZ(0deg)' : 'rotateZ(-72deg)'
                     }`,
-                    background: 'repeating-linear-gradient(45deg, #ef4444, #ef4444 8px, #ffffff 8px, #ffffff 16px)',
+                    background:
+                      'repeating-linear-gradient(45deg, #ef4444, #ef4444 8px, #ffffff 8px, #ffffff 16px)',
                     boxShadow: isGateClosed
                       ? '0 0 12px rgba(239,68,68,0.7)'
                       : '0 0 6px rgba(16,185,129,0.5)',
@@ -227,19 +282,19 @@ export const IsometricParkingLot: React.FC<IsometricParkingLotProps> = ({
                   >
                     GATE: {gateState.angle}° ({gateState.status})
                   </span>
-                  <span className="text-slate-400 text-[8px]">SERVO PIN D11</span>
+                  <span className="text-slate-300 text-[8px]">SERVO PIN D11</span>
                 </div>
               </div>
 
               {/* Center Road Divider Chevrons */}
-              <div className="flex items-center gap-2 opacity-50">
-                <div className="w-8 h-1 bg-amber-400/60 rounded-full" />
-                <div className="w-8 h-1 bg-amber-400/60 rounded-full" />
+              <div className="flex items-center gap-2 opacity-60">
+                <div className="w-8 h-1 bg-amber-400 rounded-full" />
+                <div className="w-8 h-1 bg-amber-400 rounded-full" />
               </div>
 
               {/* EXIT LANE */}
-              <div className="flex items-center gap-1 opacity-40">
-                <span className="text-xs font-mono tracking-widest text-slate-400 uppercase">
+              <div className="flex items-center gap-1 opacity-50">
+                <span className="text-xs font-mono tracking-widest text-slate-300 uppercase">
                   EXIT LANE
                 </span>
                 <span className="text-xl text-white font-mono">›››</span>
@@ -247,17 +302,23 @@ export const IsometricParkingLot: React.FC<IsometricParkingLotProps> = ({
             </div>
 
             {/* Rear Barrier Wall / Hardware Info Banner */}
-            <div className="absolute top-0 inset-x-0 h-14 rounded-t-3xl bg-[#121927] border-b border-slate-700/60 flex items-center justify-between px-6 preserve-3d">
-              <div className="flex items-center gap-2 text-[11px] font-mono tracking-widest text-slate-300 font-semibold">
+            <div
+              className={`absolute top-0 inset-x-0 h-14 rounded-t-3xl border-b flex items-center justify-between px-6 preserve-3d ${
+                isLightMode
+                  ? 'bg-slate-700 border-slate-600 text-white'
+                  : 'bg-[#121927] border-slate-700/60 text-slate-300'
+              }`}
+            >
+              <div className="flex items-center gap-2 text-[11px] font-mono tracking-widest font-semibold">
                 <div className="w-2.5 h-2.5 rounded-sm bg-cyan-400 animate-pulse" />
-                <span>ARDUINO UNO SMART PARKING</span>
+                <span>3-SLOT SMART PARKING YARD</span>
               </div>
-              <div className="flex items-center gap-3 text-[10px] font-mono text-slate-400">
-                <span>TRIG: D2,D4,D6</span>
+              <div className="flex items-center gap-3 text-[10px] font-mono opacity-90">
+                <span>HC-SR04: D2-D7</span>
                 <span aria-hidden="true">·</span>
-                <span>FSR: A0,A1,A2</span>
+                <span>FSR: A0-A2</span>
                 <span aria-hidden="true">·</span>
-                <span className="text-cyan-400">9600 BAUD</span>
+                <span className="text-cyan-400 font-bold">HC-05 / USB 9600</span>
               </div>
             </div>
 
@@ -273,8 +334,8 @@ export const IsometricParkingLot: React.FC<IsometricParkingLotProps> = ({
                     onClick={() => onSlotClick && onSlotClick(slot.id)}
                     className={`relative flex-1 h-full rounded-2xl preserve-3d transition-all duration-500 cursor-pointer group flex flex-col items-center justify-between py-3 px-2 ${
                       isOccupied
-                        ? 'border-2 border-rose-500/70 shadow-[0_0_24px_rgba(244,63,94,0.35)] bg-rose-950/15'
-                        : 'border-2 border-emerald-500/70 shadow-[0_0_24px_rgba(16,185,129,0.3)] bg-emerald-950/15'
+                        ? 'border-2 border-rose-500 shadow-[0_0_24px_rgba(244,63,94,0.35)] bg-rose-950/20'
+                        : 'border-2 border-emerald-500 shadow-[0_0_24px_rgba(16,185,129,0.3)] bg-emerald-950/20'
                     } ${
                       isSelected ? 'ring-2 ring-cyan-400 ring-offset-2 ring-offset-slate-900' : ''
                     }`}
@@ -293,15 +354,15 @@ export const IsometricParkingLot: React.FC<IsometricParkingLotProps> = ({
 
                     {/* Stenciled Slot Number and Boundary on Asphalt */}
                     <div className="w-full flex items-center justify-between px-2 pt-1 z-10">
-                      <span className="text-xs font-mono font-bold tracking-wider text-slate-300 bg-slate-900/80 px-2 py-0.5 rounded border border-white/10">
+                      <span className="text-xs font-mono font-bold tracking-wider text-white bg-black/60 px-2 py-0.5 rounded border border-white/20">
                         {slot.name}
                       </span>
                       {/* Live Quick Status */}
                       <span
                         className={`text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border transition-colors ${
                           isOccupied
-                            ? 'bg-rose-500/20 text-rose-300 border-rose-500/40 shadow-[0_0_8px_rgba(244,63,94,0.3)]'
-                            : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 shadow-[0_0_8px_rgba(16,185,129,0.3)]'
+                            ? 'bg-rose-500 text-white border-rose-400 shadow-sm'
+                            : 'bg-emerald-500 text-white border-emerald-400 shadow-sm'
                         }`}
                       >
                         {isOccupied ? 'OCCUPIED' : 'AVAILABLE'}
@@ -317,15 +378,15 @@ export const IsometricParkingLot: React.FC<IsometricParkingLotProps> = ({
                       <div
                         className={`w-7 h-7 rounded-full flex items-center justify-center border transition-all duration-500 ${
                           isOccupied
-                            ? 'bg-rose-500 border-rose-300 shadow-[0_0_20px_#f43f5e]'
-                            : 'bg-emerald-500 border-emerald-300 shadow-[0_0_20px_#10b981]'
+                            ? 'bg-rose-500 border-rose-300 shadow-[0_0_18px_#f43f5e]'
+                            : 'bg-emerald-500 border-emerald-300 shadow-[0_0_18px_#10b981]'
                         }`}
                       >
                         <div className="w-2.5 h-2.5 rounded-full bg-white animate-ping opacity-75" />
                       </div>
 
                       {/* Transducer Support Stem */}
-                      <div className="w-1 h-8 bg-slate-600/80 shadow-md" />
+                      <div className="w-1 h-8 bg-slate-400 shadow-md" />
 
                       {/* Sensor Ray Projecting Down */}
                       {showSensorRays && (
@@ -346,28 +407,28 @@ export const IsometricParkingLot: React.FC<IsometricParkingLotProps> = ({
 
                     {/* Wheel Stop Curb Block */}
                     <div
-                      className="w-20 h-2.5 rounded-sm bg-neutral-800 border-t border-slate-500/60 shadow-md flex items-center justify-around px-1 z-10"
+                      className="w-20 h-2.5 rounded-sm bg-neutral-800 border-t border-slate-400 shadow-md flex items-center justify-around px-1 z-10"
                       style={{ transform: 'translateZ(4px)' }}
                     >
-                      <div className="w-3 h-1 bg-yellow-400 rounded-full opacity-80" />
-                      <div className="w-3 h-1 bg-yellow-400 rounded-full opacity-80" />
+                      <div className="w-3 h-1 bg-yellow-400 rounded-full opacity-90" />
+                      <div className="w-3 h-1 bg-yellow-400 rounded-full opacity-90" />
                     </div>
 
-                    {/* Central Area: 3D Car or Empty Bay Ground Marking */}
+                    {/* Central Area: Normal Simple Car or Empty Bay Marking */}
                     <div className="relative w-full flex-1 flex items-center justify-center preserve-3d my-1">
                       {isOccupied ? (
-                        <Car3D car={slot.car} slotNumber={slot.id} />
+                        <Car3D car={slot.car} slotNumber={slot.id} isLightMode={isLightMode} />
                       ) : (
                         <div
                           className="flex flex-col items-center justify-center gap-1 select-none pointer-events-none"
                           style={{ transform: 'translateZ(1px)' }}
                         >
-                          <div className="w-14 h-14 rounded-full border-2 border-dashed border-emerald-500/30 flex items-center justify-center bg-emerald-500/[0.04]">
-                            <span className="text-2xl font-mono font-bold text-emerald-400/40">
+                          <div className="w-14 h-14 rounded-full border-2 border-dashed border-emerald-400/50 flex items-center justify-center bg-emerald-500/10">
+                            <span className="text-2xl font-mono font-bold text-emerald-400">
                               {slot.id}
                             </span>
                           </div>
-                          <span className="text-[10px] font-mono tracking-wider text-emerald-400/60 font-semibold uppercase">
+                          <span className="text-[10px] font-mono tracking-wider text-emerald-400 font-semibold uppercase">
                             BAY EMPTY
                           </span>
                         </div>
@@ -375,11 +436,11 @@ export const IsometricParkingLot: React.FC<IsometricParkingLotProps> = ({
                     </div>
 
                     {/* Bottom Bay Telemetry: HC-SR04 Distance & FSR Reading */}
-                    <div className="w-full flex items-center justify-between px-2 pb-1 z-10 text-[10px] font-mono text-slate-300 bg-slate-950/60 rounded-md py-0.5 border border-white/5">
+                    <div className="w-full flex items-center justify-between px-2 pb-1 z-10 text-[10px] font-mono text-slate-200 bg-black/60 rounded-md py-0.5 border border-white/10">
                       <span className="tabular-nums font-semibold">
                         {slot.distance.toFixed(1)} cm
                       </span>
-                      <span className="tabular-nums font-semibold text-indigo-300">
+                      <span className="tabular-nums font-semibold text-cyan-300">
                         FSR: {slot.fsr ?? slot.pressure}
                       </span>
                     </div>
@@ -392,16 +453,20 @@ export const IsometricParkingLot: React.FC<IsometricParkingLotProps> = ({
       </div>
 
       {/* Bottom Hint / Info Bar */}
-      <div className="absolute bottom-3 left-4 right-4 flex items-center justify-between text-[11px] text-slate-400 pointer-events-none">
-        <span className="flex items-center gap-1.5">
-          <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
+      <div
+        className={`absolute bottom-3 left-4 right-4 flex items-center justify-between text-[11px] pointer-events-none ${
+          isLightMode ? 'text-slate-600' : 'text-slate-400'
+        }`}
+      >
+        <span className="flex items-center gap-1.5 font-medium">
+          <span className="w-1.5 h-1.5 rounded-full bg-cyan-500" />
           Hardware Rule: Occupied if (Dist ≤ 3.0cm) AND (FSR ≥ 15)
         </span>
-        <div className="flex items-center gap-3">
-          <span className="flex items-center gap-1">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block" /> Available
+        <div className="flex items-center gap-3 font-semibold">
+          <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" /> Available
           </span>
-          <span className="flex items-center gap-1">
+          <span className="flex items-center gap-1 text-rose-600 dark:text-rose-400">
             <span className="w-2 h-2 rounded-full bg-rose-500 inline-block" /> Occupied
           </span>
         </div>

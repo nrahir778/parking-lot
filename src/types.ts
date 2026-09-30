@@ -1,6 +1,8 @@
 export type SlotId = 1 | 2 | 3;
 export type SlotStatus = 'AVAILABLE' | 'OCCUPIED';
 
+export type ThemeMode = 'light' | 'dark';
+
 export interface CarVisualConfig {
   bodyColor: string;
   roofColor: string;
@@ -21,7 +23,7 @@ export interface SlotData {
   hasHardwareReading: boolean;
 }
 
-export type ConnectionMode = 'disconnected' | 'connecting' | 'connected' | 'demo';
+export type ConnectionMode = 'disconnected' | 'connecting' | 'connected_usb' | 'connected_bt';
 
 export interface GateState {
   angle: number; // 0 (Open) to 90 (Closed)
@@ -50,4 +52,5 @@ export interface ArduinoPortDetails {
   usbVendorId?: number;
   usbProductId?: number;
   portLabel?: string;
+  connectionType?: 'usb' | 'bluetooth';
 }
