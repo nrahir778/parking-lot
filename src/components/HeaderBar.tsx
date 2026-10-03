@@ -9,6 +9,8 @@ import {
   Code,
   Sun,
   Moon,
+  Maximize2,
+  Minimize2,
 } from 'lucide-react';
 
 interface HeaderBarProps {
@@ -22,6 +24,8 @@ interface HeaderBarProps {
   onOpenArduinoGuide: () => void;
   isBrowserSupported: boolean;
   portLabel?: string;
+  isFullscreen?: boolean;
+  onToggleFullscreen?: () => void;
 }
 
 export const HeaderBar: React.FC<HeaderBarProps> = ({
@@ -34,6 +38,8 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
   onExportSingleFileHtml,
   onOpenArduinoGuide,
   portLabel,
+  isFullscreen = false,
+  onToggleFullscreen,
 }) => {
   const isConnected = connectionMode === 'connected_usb' || connectionMode === 'connected_bt';
   const isConnecting = connectionMode === 'connecting';
@@ -160,6 +166,24 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
               <span>Connect HC-05</span>
             </button>
           </>
+        )}
+
+        {/* Full Screen Toggle Button */}
+        {onToggleFullscreen && (
+          <button
+            onClick={onToggleFullscreen}
+            className={`px-3 py-1.5 rounded-xl text-xs font-mono font-bold flex items-center gap-1.5 transition-all whitespace-nowrap border shadow-xs ${
+              isFullscreen
+                ? 'bg-rose-600 hover:bg-rose-500 text-white border-rose-400'
+                : isLight
+                ? 'bg-slate-900 hover:bg-slate-800 text-white border-slate-700'
+                : 'bg-cyan-600 hover:bg-cyan-500 text-white border-cyan-400/50'
+            }`}
+            title={isFullscreen ? 'Exit Full Screen' : 'View Parking Lot in Full Screen'}
+          >
+            {isFullscreen ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
+            <span className="hidden sm:inline">{isFullscreen ? 'Exit Fullscreen' : 'Full Screen'}</span>
+          </button>
         )}
 
         {/* Download Standalone Single-File HTML */}

@@ -89,6 +89,19 @@ export default function App() {
   const [selectedSlotId, setSelectedSlotId] = useState<number | undefined>(undefined);
   const [isArduinoGuideOpen, setIsArduinoGuideOpen] = useState(false);
   const [portLabel, setPortLabel] = useState<string | undefined>(undefined);
+  const [isParkingLotFullscreen, setIsParkingLotFullscreen] = useState(false);
+
+  // Manage body overflow when in fullscreen mode
+  useEffect(() => {
+    if (isParkingLotFullscreen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isParkingLotFullscreen]);
 
   // MG995 Gate Servo State: 0° = Open, 90° = Closed (Lot Full)
   const [gateState, setGateState] = useState<GateState>({
@@ -394,6 +407,8 @@ export default function App() {
         onOpenArduinoGuide={() => setIsArduinoGuideOpen(true)}
         isBrowserSupported={isBrowserSupported}
         portLabel={portLabel}
+        isFullscreen={isParkingLotFullscreen}
+        onToggleFullscreen={() => setIsParkingLotFullscreen((prev) => !prev)}
       />
 
       {/* Connection Guidance Banner */}
@@ -453,6 +468,8 @@ export default function App() {
           }}
           selectedSlotId={selectedSlotId}
           isLightMode={isLight}
+          isFullscreen={isParkingLotFullscreen}
+          onToggleFullscreen={(val) => setIsParkingLotFullscreen(val)}
         />
 
         {/* Common Buzzer Indicator (Animated 1, 2, 3 pulses + D8 pin status) */}
