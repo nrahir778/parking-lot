@@ -1,8 +1,20 @@
 export interface ParsedSlotData {
   slotId: 1 | 2 | 3;
   distance: number;
-  fsr: number;
-  status: 'OCCUPIED' | 'AVAILABLE';
+  unit: string;
+  status: 'EMPTY' | 'OCCUPIED' | 'UNKNOWN' | 'AVAILABLE';
+  fsr?: number;
+  raw: string;
+}
+
+export interface ParsedSummaryData {
+  totalOccupied: number;
+  totalSlots: number;
+  occupiedFraction: string;
+  empty: number;
+  unknown: number;
+  available: number;
+  gate: 'OPEN' | 'CLOSED';
   raw: string;
 }
 
@@ -16,30 +28,142 @@ export interface ParsedGateBuzzerData {
 
 export type SerialParseResult =
   | { type: 'slot'; data: ParsedSlotData }
+  | { type: 'summary'; data: ParsedSummaryData }
   | { type: 'gate_buzzer'; data: ParsedGateBuzzerData }
+  | { type: 'ignored'; raw: string }
   | { type: 'unknown'; raw: string };
 
 export class SerialLineParser {
   /**
    * Expected formats from Arduino:
-   * 1. SLOT 1 | Distance: 2.5 cm | FSR: 45 | STATUS: OCCUPIED
-   * 2. SLOT 2 | Distance: 15.0 cm | Pressure: 0 | STATUS: AVAILABLE
-   * 3. GATE: 90 deg | BUZZER: ON  (or GATE: 0 deg | BUZZER: OFF)
-   * 4. BUZZER: 1 / 2 / 3
+   * 1. Lot 1 | Distance: 3.1 cm | Status: EMPTY
+   *    Lot 2 | Distance: 2.3 cm | Status: OCCUPIED
+   *    Lot 3 | Distance: 4.1 cm | Status: EMPTY
+   * 2. TOTAL OCCUPIED: 1/3 | EMPTY: 2 | UNKNOWN: 0 | AVAILABLE: 2 | GATE: OPEN
+   * 3. ----------------------------------------------------------------------- (ignored)
+   * 4. Legacy format: SLOT 1 | Distance: 2.5 cm | FSR: 45 | STATUS: OCCUPIED
+   * 5. GATE: 90 deg | BUZZER: ON
    */
   public static parse(line: string): SerialParseResult {
     const trimmed = line.trim();
-    if (!trimmed) return { type: 'unknown', raw: line };
+    if (!trimmed) return { type: 'ignored', raw: line };
 
-    // 1. Check for Gate and Buzzer telemetry line:
-    // e.g. "GATE: 90 deg | BUZZER: ON", "GATE: 0 | BUZZER: OFF", "GATE: 90", "SERVO: 90"
-    const gateMatch = trimmed.match(/(?:GATE|SERVO)[:\s]+(\d+)/i);
+    // 0. Ignore divider / separator lines (e.g. "-------------------" or "=======")
+    if (/^[-=_*~#]{3,}$/.test(trimmed)) {
+      return { type: 'ignored', raw: trimmed };
+    }
+
+    // 1. Check for Summary telemetry line:
+    // e.g. "TOTAL OCCUPIED: 1/3 | EMPTY: 2 | UNKNOWN: 0 | AVAILABLE: 2 | GATE: OPEN"
+    if (/(?:TOTAL\s*OCCUPIED|OCCUPIED\s*:)/i.test(trimmed) && /(?:EMPTY|AVAILABLE|UNKNOWN)/i.test(trimmed)) {
+      const occMatch = trimmed.match(/(?:TOTAL\s*OCCUPIED|OCCUPIED):\s*(\d+)(?:\s*\/\s*(\d+))?/i);
+      const emptyMatch = trimmed.match(/EMPTY:\s*(\d+)/i);
+      const unknownMatch = trimmed.match(/UNKNOWN:\s*(\d+)/i);
+      const availMatch = trimmed.match(/AVAILABLE:\s*(\d+)/i);
+      const gateMatch = trimmed.match(/GATE:\s*(OPEN|CLOSED)/i);
+
+      if (occMatch || emptyMatch || availMatch || unknownMatch) {
+        const totalOccupied = occMatch ? parseInt(occMatch[1], 10) : 0;
+        const totalSlots = (occMatch && occMatch[2]) ? parseInt(occMatch[2], 10) : 3;
+        const occupiedFraction = (occMatch && occMatch[2])
+          ? `${totalOccupied}/${totalSlots}`
+          : `${totalOccupied}/${totalSlots}`;
+        const empty = emptyMatch ? parseInt(emptyMatch[1], 10) : Math.max(0, totalSlots - totalOccupied);
+        const unknown = unknownMatch ? parseInt(unknownMatch[1], 10) : 0;
+        const available = availMatch ? parseInt(availMatch[1], 10) : empty;
+        const gate = (gateMatch ? gateMatch[1].toUpperCase() : (totalOccupied >= totalSlots ? 'CLOSED' : 'OPEN')) as 'OPEN' | 'CLOSED';
+
+        return {
+          type: 'summary',
+          data: {
+            totalOccupied,
+            totalSlots,
+            occupiedFraction,
+            empty,
+            unknown,
+            available,
+            gate,
+            raw: trimmed,
+          },
+        };
+      }
+    }
+
+    // 2. Check for Slot / Lot telemetry line:
+    // e.g. "Lot 1 | Distance: 3.1 cm | Status: EMPTY"
+    // e.g. "Lot 2 | Distance: 2.3 cm | Status: OCCUPIED"
+    // e.g. "SLOT 1 | Distance: 2.5 cm | FSR: 45 | STATUS: OCCUPIED"
+    if (/(?:LOT|SLOT)\s*[1-3]/i.test(trimmed)) {
+      const slotMatch = trimmed.match(/(?:LOT|SLOT)\s*([1-3])/i);
+      const distMatch = trimmed.match(/(?:Distance|Dist):\s*([\d.]+)\s*([a-zA-Z]+)?/i);
+      const statMatch = trimmed.match(/(?:Status|STATUS):\s*(EMPTY|OCCUPIED|UNKNOWN|AVAILABLE|VACANT)/i);
+      const fsrMatch = trimmed.match(/(?:FSR|Pressure):\s*(\d+)/i);
+
+      if (slotMatch) {
+        const slotNum = parseInt(slotMatch[1], 10);
+        const slotId = (slotNum >= 1 && slotNum <= 3 ? slotNum : 1) as 1 | 2 | 3;
+        const distance = distMatch ? parseFloat(distMatch[1]) : 0;
+        const unit = (distMatch && distMatch[2]) ? distMatch[2].toLowerCase() : 'cm';
+        const fsr = fsrMatch ? parseInt(fsrMatch[1], 10) : undefined;
+
+        // Arduino is the source of truth. Display the status exactly as received:
+        // EMPTY, OCCUPIED, or UNKNOWN. Do not independently recalculate slot status from distance!
+        let status: 'EMPTY' | 'OCCUPIED' | 'UNKNOWN' | 'AVAILABLE';
+        if (statMatch) {
+          const rawStatus = statMatch[1].toUpperCase();
+          if (rawStatus === 'OCCUPIED') {
+            status = 'OCCUPIED';
+          } else if (rawStatus === 'UNKNOWN') {
+            status = 'UNKNOWN';
+          } else if (rawStatus === 'EMPTY' || rawStatus === 'AVAILABLE' || rawStatus === 'VACANT') {
+            status = 'EMPTY';
+          } else {
+            status = 'UNKNOWN';
+          }
+        } else if (fsr !== undefined) {
+          // Legacy format without status label:
+          status = (distance <= 3.0 && fsr >= 15) ? 'OCCUPIED' : 'EMPTY';
+        } else {
+          status = 'UNKNOWN';
+        }
+
+        return {
+          type: 'slot',
+          data: {
+            slotId,
+            distance,
+            unit,
+            status,
+            fsr,
+            raw: trimmed,
+          },
+        };
+      }
+    }
+
+    // 3. Standalone Gate and Buzzer telemetry line:
+    // e.g. "GATE: OPEN | BUZZER: OFF", "GATE: 90 deg | BUZZER: ON", "GATE: 0"
+    const gateMatch = trimmed.match(/(?:GATE|SERVO)[:\s]+(OPEN|CLOSED|\d+)/i);
     const buzzerStateMatch = trimmed.match(/BUZZER[:\s]+(ON|OFF|HIGH|LOW)/i);
     const buzzerPulseMatch = trimmed.match(/(?:BUZZER|BEEP)[:\s]+([1-3])\b/i);
 
     if (gateMatch || buzzerStateMatch || buzzerPulseMatch) {
-      const gateAngle = gateMatch ? parseInt(gateMatch[1], 10) : undefined;
-      const gateStatus = gateAngle !== undefined ? (gateAngle >= 45 ? 'CLOSED' : 'OPEN') : undefined;
+      let gateAngle: number | undefined = undefined;
+      let gateStatus: 'OPEN' | 'CLOSED' | undefined = undefined;
+
+      if (gateMatch) {
+        const gVal = gateMatch[1].toUpperCase();
+        if (gVal === 'OPEN') {
+          gateStatus = 'OPEN';
+          gateAngle = 0;
+        } else if (gVal === 'CLOSED') {
+          gateStatus = 'CLOSED';
+          gateAngle = 90;
+        } else if (!isNaN(parseInt(gVal, 10))) {
+          gateAngle = parseInt(gVal, 10);
+          gateStatus = gateAngle >= 45 ? 'CLOSED' : 'OPEN';
+        }
+      }
 
       let buzzerOn: boolean | undefined = undefined;
       if (buzzerStateMatch) {
@@ -59,65 +183,6 @@ export class SerialLineParser {
           raw: trimmed,
         },
       };
-    }
-
-    // 2. Main Slot pattern with FSR or Pressure:
-    // SLOT 1 | Distance: 2.5 cm | FSR: 50 | STATUS: OCCUPIED
-    // SLOT 1 | Distance: 2.5 cm | Pressure: 500 | STATUS: OCCUPIED
-    const mainRegex = /SLOT\s*([1-3])\s*\|\s*Dist(?:ance)?:\s*([\d.]+)\s*cm\s*\|\s*(?:FSR|Pressure):\s*(\d+)\s*\|\s*STATUS:\s*(OCCUPIED|AVAILABLE|VACANT)/i;
-    const match = trimmed.match(mainRegex);
-
-    if (match) {
-      const slotNum = parseInt(match[1], 10);
-      const slotId = (slotNum >= 1 && slotNum <= 3 ? slotNum : 1) as 1 | 2 | 3;
-      const distance = parseFloat(match[2]);
-      const fsr = parseInt(match[3], 10);
-      const rawStatus = match[4].toUpperCase();
-      const status: 'OCCUPIED' | 'AVAILABLE' = rawStatus === 'OCCUPIED' ? 'OCCUPIED' : 'AVAILABLE';
-
-      return {
-        type: 'slot',
-        data: {
-          slotId,
-          distance,
-          fsr,
-          status,
-          raw: trimmed,
-        },
-      };
-    }
-
-    // 3. Flexible fallback parser if spacing/delimiters differ slightly
-    if (/SLOT\s*[1-3]/i.test(trimmed)) {
-      const slotMatch = trimmed.match(/SLOT\s*([1-3])/i);
-      const distMatch = trimmed.match(/(?:Distance|Dist):\s*([\d.]+)/i);
-      const fsrMatch = trimmed.match(/(?:FSR|Pressure):\s*(\d+)/i);
-      const statMatch = trimmed.match(/STATUS:\s*(OCCUPIED|AVAILABLE|VACANT)/i);
-
-      if (slotMatch) {
-        const slotId = parseInt(slotMatch[1], 10) as 1 | 2 | 3;
-        const distance = distMatch ? parseFloat(distMatch[1]) : 0;
-        const fsr = fsrMatch ? parseInt(fsrMatch[1], 10) : 0;
-
-        // Hardware specification: distance <= 3.0 cm AND FSR >= 15 => OCCUPIED
-        let status: 'OCCUPIED' | 'AVAILABLE';
-        if (statMatch) {
-          status = statMatch[1].toUpperCase() === 'OCCUPIED' ? 'OCCUPIED' : 'AVAILABLE';
-        } else {
-          status = (distance <= 3.0 && fsr >= 15) ? 'OCCUPIED' : 'AVAILABLE';
-        }
-
-        return {
-          type: 'slot',
-          data: {
-            slotId,
-            distance,
-            fsr,
-            status,
-            raw: trimmed,
-          },
-        };
-      }
     }
 
     return { type: 'unknown', raw: trimmed };

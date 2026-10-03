@@ -254,13 +254,50 @@ export const SerialConsole: React.FC<SerialConsoleProps> = ({
             )}
           </div>
 
+          {/* Quick Test Sample Data Bar */}
+          <div className="flex flex-wrap items-center gap-2 pt-1 text-xs font-mono">
+            <span className={`text-[10px] uppercase font-bold ${isLightMode ? 'text-slate-500' : 'text-slate-400'}`}>
+              Sample Test:
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                if (!onSendSerialCommand) return;
+                onSendSerialCommand('Lot 1 | Distance: 3.1 cm | Status: EMPTY');
+                onSendSerialCommand('Lot 2 | Distance: 2.3 cm | Status: OCCUPIED');
+                onSendSerialCommand('Lot 3 | Distance: 4.1 cm | Status: EMPTY');
+                onSendSerialCommand('TOTAL OCCUPIED: 1/3 | EMPTY: 2 | UNKNOWN: 0 | AVAILABLE: 2 | GATE: OPEN');
+                onSendSerialCommand('-----------------------------------------------------------------------');
+              }}
+              className="px-2.5 py-1 rounded-lg bg-cyan-600/15 hover:bg-cyan-600/25 text-cyan-600 dark:text-cyan-300 border border-cyan-500/30 text-[11px] font-semibold transition-all shadow-xs"
+              title="Test with the exact sample data from user prompt"
+            >
+              ▶ Inject Sample Stream (1/3 Occupied)
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (!onSendSerialCommand) return;
+                onSendSerialCommand('Lot 1 | Distance: 2.1 cm | Status: OCCUPIED');
+                onSendSerialCommand('Lot 2 | Distance: 2.3 cm | Status: OCCUPIED');
+                onSendSerialCommand('Lot 3 | Distance: 1.9 cm | Status: OCCUPIED');
+                onSendSerialCommand('TOTAL OCCUPIED: 3/3 | EMPTY: 0 | UNKNOWN: 0 | AVAILABLE: 0 | GATE: CLOSED');
+                onSendSerialCommand('-----------------------------------------------------------------------');
+              }}
+              className="px-2.5 py-1 rounded-lg bg-rose-600/15 hover:bg-rose-600/25 text-rose-600 dark:text-rose-300 border border-rose-500/30 text-[11px] font-semibold transition-all shadow-xs"
+              title="Test with all slots occupied (Lot Full, Gate Closed, Buzzer ON)"
+            >
+              ▶ Inject Full Lot (3/3 Closed)
+            </button>
+          </div>
+
           {/* Send / Inject Command Input */}
           <form onSubmit={handleSend} className="flex items-center gap-2 pt-1">
             <input
               type="text"
               value={inputCmd}
               onChange={(e) => setInputCmd(e.target.value)}
-              placeholder="Inject or test line: e.g. SLOT 1 | Distance: 2.5 cm | FSR: 45 | STATUS: OCCUPIED"
+              placeholder="Inject line: e.g. Lot 1 | Distance: 3.1 cm | Status: EMPTY"
               className={`flex-1 rounded-xl px-3.5 py-2 text-xs font-mono focus:outline-none transition-colors border ${
                 isLightMode
                   ? 'bg-white border-slate-300 text-slate-900 placeholder-slate-400 focus:border-cyan-600'

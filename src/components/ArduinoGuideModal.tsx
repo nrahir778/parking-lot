@@ -119,22 +119,26 @@ void loop() {
   }
 
   // 5. Send Telemetry to Web Dashboard via Serial (9600 Baud)
-  Serial.print("SLOT 1 | Distance: "); Serial.print(d1, 1);
-  Serial.print(" cm | FSR: "); Serial.print(fsr1);
-  Serial.print(" | STATUS: "); Serial.println(occ1 ? "OCCUPIED" : "AVAILABLE");
+  Serial.print("Lot 1 | Distance: "); Serial.print(d1, 1);
+  Serial.print(" cm | Status: "); Serial.println(occ1 ? "OCCUPIED" : "EMPTY");
 
-  Serial.print("SLOT 2 | Distance: "); Serial.print(d2, 1);
-  Serial.print(" cm | FSR: "); Serial.print(fsr2);
-  Serial.print(" | STATUS: "); Serial.println(occ2 ? "OCCUPIED" : "AVAILABLE");
+  Serial.print("Lot 2 | Distance: "); Serial.print(d2, 1);
+  Serial.print(" cm | Status: "); Serial.println(occ2 ? "OCCUPIED" : "EMPTY");
 
-  Serial.print("SLOT 3 | Distance: "); Serial.print(d3, 1);
-  Serial.print(" cm | FSR: "); Serial.print(fsr3);
-  Serial.print(" | STATUS: "); Serial.println(occ3 ? "OCCUPIED" : "AVAILABLE");
+  Serial.print("Lot 3 | Distance: "); Serial.print(d3, 1);
+  Serial.print(" cm | Status: "); Serial.println(occ3 ? "OCCUPIED" : "EMPTY");
 
-  Serial.print("GATE: "); Serial.print(allOccupied ? 90 : 0);
-  Serial.print(" deg | BUZZER: "); Serial.println(allOccupied ? "ON" : "OFF");
+  int occupiedCount = (occ1 ? 1 : 0) + (occ2 ? 1 : 0) + (occ3 ? 1 : 0);
+  int emptyCount = 3 - occupiedCount;
 
-  delay(400); // 400ms update cadence
+  Serial.print("TOTAL OCCUPIED: "); Serial.print(occupiedCount); Serial.print("/3 | ");
+  Serial.print("EMPTY: "); Serial.print(emptyCount); Serial.print(" | ");
+  Serial.print("UNKNOWN: 0 | ");
+  Serial.print("AVAILABLE: "); Serial.print(emptyCount); Serial.print(" | ");
+  Serial.print("GATE: "); Serial.println(allOccupied ? "CLOSED" : "OPEN");
+  Serial.println("-----------------------------------------------------------------------");
+
+  delay(500); // 500ms update cadence
 }
 `;
 

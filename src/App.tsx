@@ -7,6 +7,7 @@ import {
   SlotId,
   GateState,
   ThemeMode,
+  ArduinoSummaryData,
 } from './types';
 import { HeaderBar } from './components/HeaderBar';
 import { TopSummary } from './components/TopSummary';
@@ -28,12 +29,13 @@ import { Info, Bluetooth, Usb } from 'lucide-react';
 const INITIAL_SLOTS: SlotData[] = [
   {
     id: 1,
-    name: 'SLOT 1',
-    status: 'AVAILABLE',
-    distance: 45.0,
+    name: 'LOT 1',
+    status: 'UNKNOWN',
+    distance: 0.0,
+    unit: 'cm',
     pressure: 0,
     fsr: 0,
-    lastUpdated: Date.now(),
+    lastUpdated: 0,
     hasHardwareReading: false,
     car: {
       bodyColor: '#2563eb', // Royal Blue
@@ -45,12 +47,13 @@ const INITIAL_SLOTS: SlotData[] = [
   },
   {
     id: 2,
-    name: 'SLOT 2',
-    status: 'AVAILABLE',
-    distance: 42.0,
+    name: 'LOT 2',
+    status: 'UNKNOWN',
+    distance: 0.0,
+    unit: 'cm',
     pressure: 0,
     fsr: 0,
-    lastUpdated: Date.now(),
+    lastUpdated: 0,
     hasHardwareReading: false,
     car: {
       bodyColor: '#475569', // Slate Gray
@@ -62,12 +65,13 @@ const INITIAL_SLOTS: SlotData[] = [
   },
   {
     id: 3,
-    name: 'SLOT 3',
-    status: 'AVAILABLE',
-    distance: 48.0,
+    name: 'LOT 3',
+    status: 'UNKNOWN',
+    distance: 0.0,
+    unit: 'cm',
     pressure: 0,
     fsr: 0,
-    lastUpdated: Date.now(),
+    lastUpdated: 0,
     hasHardwareReading: false,
     car: {
       bodyColor: '#dc2626', // Classic Red
@@ -81,6 +85,8 @@ const INITIAL_SLOTS: SlotData[] = [
 
 export default function App() {
   const [slots, setSlots] = useState<SlotData[]>(INITIAL_SLOTS);
+  const [arduinoSummary, setArduinoSummary] = useState<ArduinoSummaryData | null>(null);
+  const [lastDataReceivedAt, setLastDataReceivedAt] = useState<number | null>(null);
   const [connectionMode, setConnectionMode] = useState<ConnectionMode>('disconnected');
   const [theme, setTheme] = useState<ThemeMode>('light'); // User requested light theme
   const [isBrowserSupported, setIsBrowserSupported] = useState(true);
@@ -191,42 +197,77 @@ export default function App() {
   // Process incoming line from Arduino hardware (USB or HC-05 Bluetooth)
   const handleIncomingSerialLine = useCallback(
     (rawLine: string) => {
-      addLog(rawLine, 'incoming');
+      const clean = rawLine.trim();
+      if (!clean) return;
 
-      const parsed = SerialLineParser.parse(rawLine);
+      addLog(clean, 'incoming');
 
+      const parsed = SerialLineParser.parse(clean);
+
+      // 0. Ignore divider lines, blank lines, startup banners
+      if (parsed.type === 'ignored') {
+        return;
+      }
+
+      // 1. Individual Lot / Slot reading line
+      // e.g. "Lot 1 | Distance: 3.1 cm | Status: EMPTY"
       if (parsed.type === 'slot') {
-        const { slotId, distance, fsr, status } = parsed.data;
+        const { slotId, distance, unit, status, fsr } = parsed.data;
+        setLastDataReceivedAt(Date.now());
 
         setSlots((currentSlots) => {
           const prevSlot = currentSlots.find((s) => s.id === slotId);
-          const wasAvailable = prevSlot ? prevSlot.status === 'AVAILABLE' : false;
+          const wasEmpty = prevSlot ? (prevSlot.status === 'EMPTY' || prevSlot.status === 'AVAILABLE') : false;
 
-          // If a slot transitions from AVAILABLE -> OCCUPIED, trigger buzzer pulse
-          if (wasAvailable && status === 'OCCUPIED') {
+          // If a slot transitions to OCCUPIED, trigger buzzer pulse for that slot
+          if (wasEmpty && status === 'OCCUPIED') {
             triggerBuzzer(slotId);
           }
 
-          const updated = currentSlots.map((slot) => {
+          // Update individual slot card as its line arrives. Do not reset other cards!
+          return currentSlots.map((slot) => {
             if (slot.id === slotId) {
               return {
                 ...slot,
                 status,
                 distance,
-                pressure: fsr,
-                fsr,
+                unit: unit || 'cm',
+                pressure: fsr ?? slot.pressure,
+                fsr: fsr ?? slot.fsr,
                 lastUpdated: Date.now(),
                 hasHardwareReading: true,
               };
             }
             return slot;
           });
-
-          // Evaluate if all 3 slots are occupied -> trigger gate & buzzer
-          syncGateAndBuzzer(updated);
-          return updated;
         });
-      } else if (parsed.type === 'gate_buzzer') {
+      }
+      // 2. Total Summary line
+      // e.g. "TOTAL OCCUPIED: 1/3 | EMPTY: 2 | UNKNOWN: 0 | AVAILABLE: 2 | GATE: OPEN"
+      else if (parsed.type === 'summary') {
+        setLastDataReceivedAt(Date.now());
+        setArduinoSummary({
+          ...parsed.data,
+          lastUpdated: Date.now(),
+        });
+
+        // Arduino is the source of truth for Gate Status
+        const isClosed = parsed.data.gate === 'CLOSED';
+        setGateState({
+          angle: isClosed ? 90 : 0,
+          status: parsed.data.gate,
+        });
+
+        // Set Hardware Buzzer State
+        const allOccupied = parsed.data.totalOccupied >= parsed.data.totalSlots;
+        setBuzzerState((prev) => ({
+          ...prev,
+          hardwareBuzzerOn: allOccupied || isClosed,
+        }));
+      }
+      // 3. Standalone Gate / Buzzer status lines
+      else if (parsed.type === 'gate_buzzer') {
+        setLastDataReceivedAt(Date.now());
         const { gateAngle, gateStatus, buzzerOn, pulseCount } = parsed.data;
 
         if (gateAngle !== undefined || gateStatus !== undefined) {
@@ -244,7 +285,7 @@ export default function App() {
         }
       }
     },
-    [addLog, triggerBuzzer, syncGateAndBuzzer]
+    [addLog, triggerBuzzer]
   );
 
   // Check Web Serial and Web Bluetooth support on mount
@@ -451,11 +492,13 @@ export default function App() {
         {/* Top Summary Bar */}
         <TopSummary
           slots={slots}
+          arduinoSummary={arduinoSummary}
           gateState={gateState}
           hardwareBuzzerOn={buzzerState.hardwareBuzzerOn}
           connectionMode={connectionMode}
           portLabel={portLabel}
           isLightMode={isLight}
+          lastDataReceivedAt={lastDataReceivedAt}
         />
 
         {/* 3D Isometric Parking Yard (Realistic, Simple Normal Cars, Light & Dark Theme) */}

@@ -1,5 +1,5 @@
 export type SlotId = 1 | 2 | 3;
-export type SlotStatus = 'AVAILABLE' | 'OCCUPIED';
+export type SlotStatus = 'EMPTY' | 'OCCUPIED' | 'UNKNOWN' | 'AVAILABLE';
 
 export type ThemeMode = 'light' | 'dark';
 
@@ -15,12 +15,24 @@ export interface SlotData {
   id: SlotId;
   name: string;
   status: SlotStatus;
-  distance: number; // in cm (from HC-SR04)
-  pressure: number; // 0 - 1023 (FSR analog reading)
-  fsr: number; // 0 - 1023 (FSR analog reading on A0, A1, A2)
-  lastUpdated: number; // timestamp
+  distance: number; // in cm
+  unit?: string; // e.g. 'cm'
+  pressure?: number; // legacy FSR reading if reported
+  fsr?: number; // legacy FSR reading
+  lastUpdated: number; // timestamp of last reading
   car: CarVisualConfig;
   hasHardwareReading: boolean;
+}
+
+export interface ArduinoSummaryData {
+  totalOccupied: number;
+  totalSlots: number;
+  occupiedFraction: string; // e.g. "1/3"
+  empty: number;
+  unknown: number;
+  available: number;
+  gate: 'OPEN' | 'CLOSED';
+  lastUpdated: number;
 }
 
 export type ConnectionMode = 'disconnected' | 'connecting' | 'connected_usb' | 'connected_bt';

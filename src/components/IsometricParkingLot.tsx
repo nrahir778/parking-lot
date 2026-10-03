@@ -495,6 +495,8 @@ export const IsometricParkingLot: React.FC<IsometricParkingLotProps> = ({
             >
               {slots.map((slot) => {
                 const isOccupied = slot.status === 'OCCUPIED';
+                const isEmpty = slot.status === 'EMPTY' || slot.status === 'AVAILABLE';
+                const isUnknown = slot.status === 'UNKNOWN';
                 const isSelected = selectedSlotId === slot.id;
 
                 return (
@@ -502,13 +504,17 @@ export const IsometricParkingLot: React.FC<IsometricParkingLotProps> = ({
                     key={slot.id}
                     onClick={() => onSlotClick && onSlotClick(slot.id)}
                     className={`relative flex-1 h-full rounded-xl preserve-3d transition-all duration-500 cursor-pointer group flex flex-col items-center justify-between py-2 px-1.5 ${
-                      isLightMode
-                        ? isOccupied
+                      isOccupied
+                        ? isLightMode
                           ? 'border-2 border-rose-500 bg-rose-950/20 shadow-[0_0_20px_rgba(244,63,94,0.3)]'
-                          : 'border-2 border-emerald-500 bg-emerald-950/15 shadow-[0_0_20px_rgba(16,185,129,0.25)]'
-                        : isOccupied
-                        ? 'border-2 border-rose-500 bg-rose-950/30 shadow-[0_0_24px_rgba(244,63,94,0.4)]'
-                        : 'border-2 border-emerald-500 bg-emerald-950/25 shadow-[0_0_24px_rgba(16,185,129,0.35)]'
+                          : 'border-2 border-rose-500 bg-rose-950/30 shadow-[0_0_24px_rgba(244,63,94,0.4)]'
+                        : isEmpty
+                        ? isLightMode
+                          ? 'border-2 border-emerald-500 bg-emerald-950/15 shadow-[0_0_20px_rgba(16,185,129,0.25)]'
+                          : 'border-2 border-emerald-500 bg-emerald-950/25 shadow-[0_0_24px_rgba(16,185,129,0.35)]'
+                        : isLightMode
+                        ? 'border-2 border-slate-400 bg-slate-800/10'
+                        : 'border-2 border-slate-600 bg-slate-900/30'
                     } ${
                       isSelected
                         ? 'ring-2 ring-cyan-400 ring-offset-2 ring-offset-slate-900 scale-[1.01]'
@@ -518,12 +524,14 @@ export const IsometricParkingLot: React.FC<IsometricParkingLotProps> = ({
                     {/* Realistic Painted Stall Markings (White Hairpin Borders on Asphalt) */}
                     <div className="absolute inset-0 rounded-xl pointer-events-none border border-white/20" />
 
-                    {/* Glowing Floor Neon Halo (Emerald Green or Crimson Red) */}
+                    {/* Glowing Floor Neon Halo (Emerald Green, Crimson Red, or Neutral Grey) */}
                     <div
                       className={`absolute inset-0 rounded-xl pointer-events-none transition-all duration-700 ${
                         isOccupied
                           ? 'bg-rose-500/10 shadow-[inset_0_0_22px_rgba(244,63,94,0.35)]'
-                          : 'bg-emerald-500/10 shadow-[inset_0_0_22px_rgba(16,185,129,0.25)]'
+                          : isEmpty
+                          ? 'bg-emerald-500/10 shadow-[inset_0_0_22px_rgba(16,185,129,0.25)]'
+                          : 'bg-slate-500/5'
                       }`}
                     />
 
@@ -531,7 +539,7 @@ export const IsometricParkingLot: React.FC<IsometricParkingLotProps> = ({
                     <div className="w-full flex items-center justify-between px-2 pt-0.5 z-20">
                       <div className="flex items-center gap-1.5">
                         <span className="text-xs font-mono font-black tracking-wider text-white bg-slate-950/80 px-2 py-0.5 rounded border border-white/20 shadow-xs">
-                          {slot.name}
+                          {slot.name.toUpperCase().startsWith('LOT') ? slot.name : `LOT ${slot.id}`}
                         </span>
                         <span className="text-[9px] font-mono text-cyan-300 font-bold hidden sm:inline">
                           D{slot.id * 2}/D{slot.id * 2 + 1}
@@ -543,10 +551,12 @@ export const IsometricParkingLot: React.FC<IsometricParkingLotProps> = ({
                         className={`text-[9px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border transition-all ${
                           isOccupied
                             ? 'bg-rose-600 text-white border-rose-400 shadow-sm shadow-rose-600/50'
-                            : 'bg-emerald-600 text-white border-emerald-400 shadow-sm shadow-emerald-600/50'
+                            : isEmpty
+                            ? 'bg-emerald-600 text-white border-emerald-400 shadow-sm shadow-emerald-600/50'
+                            : 'bg-slate-600 text-slate-100 border-slate-400'
                         }`}
                       >
-                        {isOccupied ? 'OCCUPIED' : 'VACANT'}
+                        {isOccupied ? 'OCCUPIED' : isEmpty ? 'EMPTY' : 'UNKNOWN'}
                       </span>
                     </div>
 
@@ -560,7 +570,9 @@ export const IsometricParkingLot: React.FC<IsometricParkingLotProps> = ({
                         className={`w-7 h-7 rounded-full flex items-center justify-center border-2 transition-all duration-500 shadow-lg ${
                           isOccupied
                             ? 'bg-rose-500 border-rose-200 shadow-[0_0_20px_#f43f5e]'
-                            : 'bg-emerald-500 border-emerald-200 shadow-[0_0_20px_#10b981]'
+                            : isEmpty
+                            ? 'bg-emerald-500 border-emerald-200 shadow-[0_0_20px_#10b981]'
+                            : 'bg-slate-600 border-slate-400'
                         }`}
                       >
                         <div className="w-2.5 h-2.5 rounded-full bg-white animate-ping opacity-80" />
@@ -585,12 +597,16 @@ export const IsometricParkingLot: React.FC<IsometricParkingLotProps> = ({
                           className={`w-0.5 h-16 pointer-events-none transition-all duration-500 ${
                             isOccupied
                               ? 'bg-gradient-to-b from-rose-500 to-transparent'
-                              : 'bg-gradient-to-b from-emerald-500 to-transparent'
+                              : isEmpty
+                              ? 'bg-gradient-to-b from-emerald-500 to-transparent'
+                              : 'bg-gradient-to-b from-slate-400 to-transparent'
                           }`}
                           style={{
                             boxShadow: isOccupied
                               ? '0 0 10px rgba(244,63,94,0.9)'
-                              : '0 0 10px rgba(16,185,129,0.9)',
+                              : isEmpty
+                              ? '0 0 10px rgba(16,185,129,0.9)'
+                              : 'none',
                           }}
                         />
                       )}
@@ -613,51 +629,44 @@ export const IsometricParkingLot: React.FC<IsometricParkingLotProps> = ({
                           style={{ transform: 'translateZ(1px)' }}
                         >
                           {/* Stenciled Highway Road Number Painted on Asphalt */}
-                          <div className="w-16 h-16 rounded-full border-2 border-dashed border-emerald-400/60 flex flex-col items-center justify-center bg-emerald-500/10">
-                            <span className="text-3xl font-mono font-black text-emerald-400">
+                          <div
+                            className={`w-16 h-16 rounded-full border-2 border-dashed flex flex-col items-center justify-center ${
+                              isEmpty
+                                ? 'border-emerald-400/60 bg-emerald-500/10'
+                                : 'border-slate-500/60 bg-slate-500/10'
+                            }`}
+                          >
+                            <span
+                              className={`text-3xl font-mono font-black ${
+                                isEmpty ? 'text-emerald-400' : 'text-slate-400'
+                              }`}
+                            >
                               0{slot.id}
                             </span>
                           </div>
-                          <span className="text-[10px] font-mono tracking-widest text-emerald-400 font-bold uppercase">
-                            VACANT BAY
+                          <span
+                            className={`text-[10px] font-mono tracking-widest font-bold uppercase ${
+                              isEmpty ? 'text-emerald-400' : 'text-slate-400'
+                            }`}
+                          >
+                            {isEmpty ? 'EMPTY' : 'UNKNOWN'}
                           </span>
                         </div>
                       )}
                     </div>
 
-                    {/* FLUSH-MOUNTED FSR PRESSURE SENSOR PAD (A0, A1, A2) */}
-                    <div
-                      className={`w-28 h-5 rounded-md border flex items-center justify-between px-2 text-[9px] font-mono transition-all z-20 ${
-                        (slot.fsr ?? slot.pressure) >= 15
-                          ? 'bg-amber-950/80 border-amber-400 text-amber-200 shadow-[0_0_12px_rgba(245,158,11,0.6)]'
-                          : 'bg-black/60 border-slate-600 text-slate-400'
-                      }`}
-                      style={{ transform: 'translateZ(2px)' }}
-                      title={`FSR Pressure Load Cell A${slot.id - 1}`}
-                    >
-                      <div className="flex items-center gap-1">
-                        <div
-                          className={`w-2 h-2 rounded-full ${
-                            (slot.fsr ?? slot.pressure) >= 15
-                              ? 'bg-amber-400 animate-ping'
-                              : 'bg-slate-600'
-                          }`}
-                        />
-                        <span className="font-bold">FSR A{slot.id - 1}</span>
-                      </div>
-                      <span className="font-bold tabular-nums">
-                        {(slot.fsr ?? slot.pressure) >= 15 ? 'PRESSED' : 'NORMAL'}
-                      </span>
-                    </div>
-
-                    {/* BOTTOM TELEMETRY BAR: Ultrasonic Distance (cm) & FSR ADC Reading */}
+                    {/* BOTTOM TELEMETRY BAR: Ultrasonic Distance & Arduino Status */}
                     <div className="w-full flex items-center justify-between px-2 py-1 z-20 text-[10px] font-mono text-slate-200 bg-slate-950/90 rounded-md border border-white/10 shadow-sm mt-1">
                       <span className="tabular-nums font-semibold flex items-center gap-1">
                         <Radio className="w-2.5 h-2.5 text-cyan-400" />
-                        {slot.distance.toFixed(1)} cm
+                        {slot.hasHardwareReading ? `${slot.distance.toFixed(1)} ${slot.unit || 'cm'}` : '--.- cm'}
                       </span>
-                      <span className="tabular-nums font-bold text-amber-300">
-                        FSR: {slot.fsr ?? slot.pressure}
+                      <span
+                        className={`tabular-nums font-bold ${
+                          isOccupied ? 'text-rose-400' : isEmpty ? 'text-emerald-400' : 'text-slate-400'
+                        }`}
+                      >
+                        {slot.status}
                       </span>
                     </div>
                   </div>

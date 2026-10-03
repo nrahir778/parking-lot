@@ -1,36 +1,73 @@
-import React from 'react';
-import { SlotData, GateState, ConnectionMode } from '../types';
+import React, { useState, useEffect } from 'react';
+import { SlotData, GateState, ConnectionMode, ArduinoSummaryData } from '../types';
 import {
+  Car,
+  CheckCircle2,
   ParkingSquare,
-  AlertCircle,
+  HelpCircle,
+  ShieldCheck,
   ShieldAlert,
-  Bell,
-  Cpu,
+  Clock,
+  Wifi,
+  WifiOff,
+  AlertTriangle,
   Bluetooth,
   Usb,
 } from 'lucide-react';
 
 interface TopSummaryProps {
   slots: SlotData[];
+  arduinoSummary?: ArduinoSummaryData | null;
   gateState: GateState;
   hardwareBuzzerOn: boolean;
   connectionMode: ConnectionMode;
   portLabel?: string;
   isLightMode?: boolean;
+  lastDataReceivedAt?: number | null;
 }
 
 export const TopSummary: React.FC<TopSummaryProps> = ({
   slots,
+  arduinoSummary,
   gateState,
   hardwareBuzzerOn,
   connectionMode,
   portLabel,
   isLightMode = false,
+  lastDataReceivedAt,
 }) => {
-  const totalSlots = slots.length;
-  const occupiedSlots = slots.filter((s) => s.status === 'OCCUPIED').length;
-  const availableSlots = totalSlots - occupiedSlots;
-  const isLotFull = occupiedSlots === totalSlots;
+  // Timer tick to keep "Xs ago" and stale status updated live
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const isConnected = connectionMode === 'connected_usb' || connectionMode === 'connected_bt';
+  const secondsSinceLastData = lastDataReceivedAt ? Math.round((now - lastDataReceivedAt) / 1000) : null;
+  const isStale = isConnected && secondsSinceLastData !== null && secondsSinceLastData > 6;
+
+  // Use Arduino summary line if available, otherwise compute from slots
+  const totalSlots = arduinoSummary ? arduinoSummary.totalSlots : slots.length;
+  const occupiedCount = arduinoSummary
+    ? arduinoSummary.totalOccupied
+    : slots.filter((s) => s.status === 'OCCUPIED').length;
+  const occupiedFraction = arduinoSummary
+    ? arduinoSummary.occupiedFraction
+    : `${occupiedCount}/${totalSlots}`;
+  const emptyCount = arduinoSummary
+    ? arduinoSummary.empty
+    : slots.filter((s) => s.status === 'EMPTY' || s.status === 'AVAILABLE').length;
+  const unknownCount = arduinoSummary
+    ? arduinoSummary.unknown
+    : slots.filter((s) => s.status === 'UNKNOWN').length;
+  const availableCount = arduinoSummary
+    ? arduinoSummary.available
+    : emptyCount;
+
+  // Gate status priority: Arduino summary > gateState
+  const effectiveGateStatus = arduinoSummary ? arduinoSummary.gate : gateState.status;
+  const isGateOpen = effectiveGateStatus === 'OPEN';
 
   const cardBaseStyle = isLightMode
     ? 'bg-white border-slate-200 shadow-sm text-slate-900'
@@ -38,256 +75,236 @@ export const TopSummary: React.FC<TopSummaryProps> = ({
 
   return (
     <div className="w-full space-y-3">
-      {/* 4-Card Primary Status Grid (Mobile: 2x2 grid, Laptop: 4 columns) */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3 md:gap-4">
-        {/* 1. Occupied & Empty Count Card */}
-        <div className={`rounded-xl sm:rounded-2xl p-3 sm:p-4 flex items-center justify-between border ${cardBaseStyle}`}>
-          <div className="min-w-0 flex-1">
+      {/* Real-time Connection Status & Last Received Data Bar */}
+      <div
+        className={`px-3.5 sm:px-4 py-2.5 rounded-xl border flex flex-wrap items-center justify-between gap-2.5 text-xs font-mono transition-colors shadow-xs ${
+          isStale
+            ? isLightMode
+              ? 'bg-amber-50 border-amber-300 text-amber-900'
+              : 'bg-amber-950/30 border-amber-500/40 text-amber-200'
+            : isLightMode
+            ? 'bg-white border-slate-200 text-slate-700'
+            : 'glass-panel border-slate-800 text-slate-300'
+        }`}
+      >
+        <div className="flex items-center flex-wrap gap-2.5">
+          {/* Connection Mode Pill */}
+          <div className="flex items-center gap-1.5 font-bold">
             <span
-              className={`text-[10px] sm:text-[11px] font-medium tracking-wider uppercase block truncate ${
-                isLightMode ? 'text-slate-500' : 'text-slate-400'
-              }`}
-            >
-              Occupied / Empty
-            </span>
-            <div className="flex items-baseline flex-wrap gap-1 sm:gap-2 mt-0.5 sm:mt-1">
-              <span className="text-2xl sm:text-3xl font-mono font-bold tabular-nums">
-                {occupiedSlots}
-                <span
-                  className={`text-lg sm:text-xl font-normal ${
-                    isLightMode ? 'text-slate-400' : 'text-slate-500'
-                  }`}
-                >
-                  {' '}
-                  / {totalSlots}
-                </span>
-              </span>
-              <span
-                className={`text-[10px] sm:text-xs font-mono font-bold ${
-                  isLotFull
-                    ? 'text-rose-600 dark:text-rose-400'
-                    : 'text-emerald-600 dark:text-emerald-400'
-                }`}
-              >
-                {isLotFull ? 'FULL' : `${availableSlots} FREE`}
-              </span>
-            </div>
-            <div
-              className={`text-[10px] sm:text-xs mt-0.5 sm:mt-1 flex items-center gap-1 sm:gap-1.5 truncate ${
-                isLightMode ? 'text-slate-500' : 'text-slate-400'
-              }`}
-            >
-              <span
-                className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full shrink-0 ${
-                  isLotFull ? 'bg-rose-500 animate-pulse' : 'bg-emerald-500'
-                }`}
-              />
-              <span className="truncate">{isLotFull ? 'All bays full' : `${availableSlots} available`}</span>
-            </div>
-          </div>
-          <div
-            className={`w-8 h-8 sm:w-11 sm:h-11 rounded-lg sm:rounded-xl flex items-center justify-center border shadow-xs shrink-0 ml-1.5 ${
-              isLotFull
-                ? 'bg-rose-500/15 text-rose-600 border-rose-500/30'
-                : 'bg-emerald-500/15 text-emerald-600 border-emerald-500/30'
-            }`}
-          >
-            {isLotFull ? <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5" /> : <ParkingSquare className="w-4 h-4 sm:w-5 sm:h-5" />}
-          </div>
-        </div>
-
-        {/* 2. MG995 Gate Servo Status Card */}
-        <div
-          className={`rounded-xl sm:rounded-2xl p-3 sm:p-4 flex items-center justify-between border transition-all ${
-            gateState.status === 'CLOSED'
-              ? isLightMode
-                ? 'bg-rose-50/80 border-rose-200 text-slate-900'
-                : 'border-rose-500/30 bg-rose-950/[0.1] text-white'
-              : cardBaseStyle
-          }`}
-        >
-          <div className="min-w-0 flex-1">
-            <span
-              className={`text-[10px] sm:text-[11px] font-medium tracking-wider uppercase block truncate ${
-                isLightMode ? 'text-slate-500' : 'text-slate-400'
-              }`}
-            >
-              MG995 Gate
-            </span>
-            <div className="flex items-baseline flex-wrap gap-1 sm:gap-2 mt-0.5 sm:mt-1">
-              <span className="text-xl sm:text-2xl font-mono font-bold tabular-nums">
-                {gateState.angle}°
-              </span>
-              <span
-                className={`text-[10px] sm:text-xs font-mono font-bold uppercase ${
-                  gateState.status === 'CLOSED'
-                    ? 'text-rose-600 dark:text-rose-400'
-                    : 'text-emerald-600 dark:text-emerald-400'
-                }`}
-              >
-                {gateState.status}
-              </span>
-            </div>
-            <div
-              className={`text-[10px] sm:text-xs mt-0.5 sm:mt-1 flex items-center gap-1 sm:gap-1.5 truncate ${
-                isLightMode ? 'text-slate-500' : 'text-slate-400'
-              }`}
-            >
-              <span className="font-mono text-[9px] sm:text-[10px]">Pin D11</span>
-              <span aria-hidden="true">·</span>
-              <span className="truncate">
-                {gateState.status === 'CLOSED' ? 'Closed' : 'Open'}
-              </span>
-            </div>
-          </div>
-          <div
-            className={`w-8 h-8 sm:w-11 sm:h-11 rounded-lg sm:rounded-xl flex items-center justify-center border shadow-xs shrink-0 ml-1.5 ${
-              gateState.status === 'CLOSED'
-                ? 'bg-rose-500/15 text-rose-600 border-rose-500/40'
-                : 'bg-emerald-500/15 text-emerald-600 border-emerald-500/40'
-            }`}
-          >
-            <ShieldAlert className="w-4 h-4 sm:w-5 sm:h-5" />
-          </div>
-        </div>
-
-        {/* 3. Arduino Buzzer Status Card */}
-        <div
-          className={`rounded-xl sm:rounded-2xl p-3 sm:p-4 flex items-center justify-between border transition-all ${
-            hardwareBuzzerOn
-              ? isLightMode
-                ? 'bg-amber-50 border-amber-300 text-slate-900'
-                : 'border-amber-500/40 bg-amber-950/[0.2] text-white'
-              : cardBaseStyle
-          }`}
-        >
-          <div className="min-w-0 flex-1">
-            <span
-              className={`text-[10px] sm:text-[11px] font-medium tracking-wider uppercase block truncate ${
-                isLightMode ? 'text-slate-500' : 'text-slate-400'
-              }`}
-            >
-              Buzzer Pin D8
-            </span>
-            <div className="flex items-baseline flex-wrap gap-1 sm:gap-2 mt-0.5 sm:mt-1">
-              <span
-                className={`text-xl sm:text-2xl font-mono font-bold tabular-nums ${
-                  hardwareBuzzerOn
-                    ? 'text-amber-600 dark:text-amber-400'
-                    : isLightMode
-                    ? 'text-slate-700'
-                    : 'text-slate-300'
-                }`}
-              >
-                {hardwareBuzzerOn ? 'ON' : 'OFF'}
-              </span>
-              <span
-                className={`text-[9px] sm:text-[11px] font-mono ${
-                  isLightMode ? 'text-slate-500' : 'text-slate-400'
-                }`}
-              >
-                {hardwareBuzzerOn ? 'ALARM' : 'QUIET'}
-              </span>
-            </div>
-            <div
-              className={`text-[10px] sm:text-xs mt-0.5 sm:mt-1 flex items-center gap-1 sm:gap-1.5 truncate ${
-                isLightMode ? 'text-slate-500' : 'text-slate-400'
-              }`}
-            >
-              <span className="font-mono text-[9px] sm:text-[10px]">Pin D8</span>
-              <span aria-hidden="true">·</span>
-              <span className="truncate">
-                {hardwareBuzzerOn ? 'Alarm active' : 'Silent'}
-              </span>
-            </div>
-          </div>
-          <div
-            className={`w-8 h-8 sm:w-11 sm:h-11 rounded-lg sm:rounded-xl flex items-center justify-center border shadow-xs shrink-0 ml-1.5 ${
-              hardwareBuzzerOn
-                ? 'bg-amber-500/20 text-amber-600 border-amber-500/50 animate-pulse'
-                : isLightMode
-                ? 'bg-slate-100 text-slate-500 border-slate-200'
-                : 'bg-slate-800 text-slate-400 border-slate-700'
-            }`}
-          >
-            <Bell className="w-4 h-4 sm:w-5 sm:h-5" />
-          </div>
-        </div>
-
-        {/* 4. Hardware Connection Status Card */}
-        <div className={`rounded-xl sm:rounded-2xl p-3 sm:p-4 flex items-center justify-between border ${cardBaseStyle}`}>
-          <div className="min-w-0 flex-1">
-            <span
-              className={`text-[10px] sm:text-[11px] font-medium tracking-wider uppercase block truncate ${
-                isLightMode ? 'text-slate-500' : 'text-slate-400'
-              }`}
-            >
-              Hardware Link
-            </span>
-            <div className="flex items-baseline flex-wrap gap-1 sm:gap-2 mt-0.5 sm:mt-1">
-              <span className="text-sm sm:text-base font-mono font-bold uppercase truncate">
-                {connectionMode === 'connected_usb'
-                  ? 'USB LINK'
-                  : connectionMode === 'connected_bt'
-                  ? 'HC-05 BT'
+              className={`w-2.5 h-2.5 rounded-full ${
+                isConnected
+                  ? isStale
+                    ? 'bg-amber-500 animate-pulse'
+                    : 'bg-emerald-500 shadow-[0_0_8px_#10b981]'
                   : connectionMode === 'connecting'
-                  ? 'WAITING'
-                  : 'OFFLINE'}
-              </span>
-            </div>
-            <div
-              className={`text-[10px] sm:text-xs mt-0.5 sm:mt-1 flex items-center gap-1 sm:gap-1.5 truncate ${
-                isLightMode ? 'text-slate-500' : 'text-slate-400'
+                  ? 'bg-amber-400 animate-ping'
+                  : 'bg-slate-400'
               }`}
-            >
-              <span
-                className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full shrink-0 ${
-                  connectionMode.startsWith('connected')
-                    ? 'bg-emerald-500 shadow-[0_0_6px_#10b981]'
-                    : connectionMode === 'connecting'
-                    ? 'bg-amber-400 animate-ping'
-                    : 'bg-slate-400'
-                }`}
-              />
-              <span className="truncate">
-                {connectionMode.startsWith('connected') ? '9600 Baud' : 'Disconnected'}
-              </span>
+            />
+            <span className="uppercase">
+              {connectionMode === 'connected_usb'
+                ? `USB: ${portLabel || 'ARDUINO UNO'}`
+                : connectionMode === 'connected_bt'
+                ? `BT: ${portLabel || 'HC-05'}`
+                : connectionMode === 'connecting'
+                ? 'CONNECTING TO ARDUINO...'
+                : 'OFFLINE / AWAITING SERIAL MONITOR DATA'}
+            </span>
+          </div>
+
+          <span aria-hidden="true" className="opacity-30">|</span>
+
+          {/* Stale / Live Status Indicator */}
+          {isConnected && (
+            <div className="flex items-center gap-1.5 font-semibold">
+              {isStale ? (
+                <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400">
+                  <AlertTriangle className="w-3.5 h-3.5" />
+                  <span>STALE DATA ({secondsSinceLastData}s since last line)</span>
+                </span>
+              ) : (
+                <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
+                  <span>LIVE ARDUINO FEED</span>
+                </span>
+              )}
             </div>
-          </div>
-          <div
-            className={`w-8 h-8 sm:w-11 sm:h-11 rounded-lg sm:rounded-xl flex items-center justify-center border shadow-xs shrink-0 ml-1.5 ${
-              connectionMode === 'connected_bt'
-                ? 'bg-blue-500/15 text-blue-600 border-blue-500/30'
-                : connectionMode === 'connected_usb'
-                ? 'bg-cyan-500/15 text-cyan-600 border-cyan-500/30'
-                : 'bg-slate-500/10 text-slate-400 border-slate-500/20'
-            }`}
-          >
-            {connectionMode === 'connected_bt' ? (
-              <Bluetooth className="w-4 h-4 sm:w-5 sm:h-5" />
-            ) : (
-              <Usb className="w-4 h-4 sm:w-5 sm:h-5" />
-            )}
-          </div>
+          )}
+        </div>
+
+        {/* Time of Last Received Data */}
+        <div className="flex items-center gap-2">
+          <Clock className="w-3.5 h-3.5 opacity-70" />
+          <span>
+            Last Received:{' '}
+            <strong className="text-cyan-600 dark:text-cyan-400">
+              {lastDataReceivedAt
+                ? `${new Date(lastDataReceivedAt).toLocaleTimeString()} (${
+                    secondsSinceLastData === 0 ? 'just now' : `${secondsSinceLastData}s ago`
+                  })`
+                : 'No serial data yet'}
+            </strong>
+          </span>
         </div>
       </div>
 
-      {/* Hardware Logic Bar */}
-      <div
-        className={`px-3 sm:px-4 py-2 rounded-xl border flex flex-wrap items-center justify-between gap-2 text-[10px] sm:text-xs font-mono transition-colors ${
-          isLightMode
-            ? 'bg-slate-50 border-slate-200 text-slate-600'
-            : 'bg-slate-900/60 border-slate-800/80 text-slate-400'
-        }`}
-      >
-        <div className="flex items-center gap-2">
-          <span className="text-cyan-600 dark:text-cyan-400 font-semibold">DETECTION RULE:</span>
-          <span>Slot is OCCUPIED when (Distance ≤ 3.0 cm) AND (FSR ≥ 15)</span>
+      {/* Large Summary Cards: OCCUPIED (1/3), EMPTY (2), UNKNOWN (0), AVAILABLE (2) */}
+      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-5 gap-2.5 sm:gap-3 md:gap-4">
+        {/* 1. OCCUPIED CARD */}
+        <div
+          className={`rounded-xl sm:rounded-2xl p-3.5 sm:p-4 flex items-center justify-between border transition-all ${
+            occupiedCount > 0
+              ? isLightMode
+                ? 'bg-rose-50/90 border-rose-300 text-slate-900 shadow-rose-100/50'
+                : 'border-rose-500/40 bg-rose-950/20 text-white shadow-[0_4px_20px_rgba(244,63,94,0.15)]'
+              : cardBaseStyle
+          }`}
+        >
+          <div className="min-w-0 flex-1">
+            <span className="text-[10px] sm:text-[11px] font-bold tracking-wider uppercase block truncate text-rose-600 dark:text-rose-400">
+              OCCUPIED
+            </span>
+            <div className="flex items-baseline gap-1.5 mt-0.5 sm:mt-1">
+              <span className="text-2xl sm:text-3xl font-mono font-black tabular-nums tracking-tight">
+                {occupiedFraction}
+              </span>
+            </div>
+            <span className="text-[10px] font-mono text-slate-500 dark:text-slate-400 block truncate mt-0.5">
+              {occupiedCount === totalSlots ? 'Lot is completely full' : `${occupiedCount} space taken`}
+            </span>
+          </div>
+          <div
+            className={`w-9 h-9 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center border shadow-xs shrink-0 ml-1.5 ${
+              occupiedCount > 0
+                ? 'bg-rose-500/20 text-rose-600 border-rose-500/40'
+                : 'bg-slate-500/10 text-slate-400 border-slate-500/20'
+            }`}
+          >
+            <Car className="w-4 h-4 sm:w-5 sm:h-5" />
+          </div>
         </div>
-        <div className="flex items-center gap-3">
-          <span>All 3 Occupied → Servo 90° (Gate Closed) + Buzzer ON</span>
-          <span aria-hidden="true" className="opacity-40">·</span>
-          <span>Baud: 9600</span>
+
+        {/* 2. EMPTY CARD */}
+        <div
+          className={`rounded-xl sm:rounded-2xl p-3.5 sm:p-4 flex items-center justify-between border transition-all ${
+            emptyCount > 0
+              ? isLightMode
+                ? 'bg-emerald-50/90 border-emerald-300 text-slate-900 shadow-emerald-100/50'
+                : 'border-emerald-500/40 bg-emerald-950/20 text-white shadow-[0_4px_20px_rgba(16,185,129,0.15)]'
+              : cardBaseStyle
+          }`}
+        >
+          <div className="min-w-0 flex-1">
+            <span className="text-[10px] sm:text-[11px] font-bold tracking-wider uppercase block truncate text-emerald-600 dark:text-emerald-400">
+              EMPTY
+            </span>
+            <div className="flex items-baseline gap-1.5 mt-0.5 sm:mt-1">
+              <span className="text-2xl sm:text-3xl font-mono font-black tabular-nums tracking-tight text-emerald-600 dark:text-emerald-400">
+                {emptyCount}
+              </span>
+              <span className="text-xs font-mono font-bold opacity-75">/ {totalSlots}</span>
+            </div>
+            <span className="text-[10px] font-mono text-slate-500 dark:text-slate-400 block truncate mt-0.5">
+              Vacant parking bays
+            </span>
+          </div>
+          <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center border shadow-xs shrink-0 ml-1.5 bg-emerald-500/20 text-emerald-600 border-emerald-500/40">
+            <ParkingSquare className="w-4 h-4 sm:w-5 sm:h-5" />
+          </div>
+        </div>
+
+        {/* 3. AVAILABLE CARD */}
+        <div
+          className={`rounded-xl sm:rounded-2xl p-3.5 sm:p-4 flex items-center justify-between border transition-all ${
+            availableCount > 0
+              ? isLightMode
+                ? 'bg-teal-50/90 border-teal-300 text-slate-900 shadow-teal-100/50'
+                : 'border-teal-500/40 bg-teal-950/20 text-white shadow-[0_4px_20px_rgba(20,184,166,0.15)]'
+              : cardBaseStyle
+          }`}
+        >
+          <div className="min-w-0 flex-1">
+            <span className="text-[10px] sm:text-[11px] font-bold tracking-wider uppercase block truncate text-teal-600 dark:text-teal-400">
+              AVAILABLE
+            </span>
+            <div className="flex items-baseline gap-1.5 mt-0.5 sm:mt-1">
+              <span className="text-2xl sm:text-3xl font-mono font-black tabular-nums tracking-tight text-teal-600 dark:text-teal-400">
+                {availableCount}
+              </span>
+              <span className="text-xs font-mono font-bold opacity-75">SPACES</span>
+            </div>
+            <span className="text-[10px] font-mono text-slate-500 dark:text-slate-400 block truncate mt-0.5">
+              Ready for entry
+            </span>
+          </div>
+          <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center border shadow-xs shrink-0 ml-1.5 bg-teal-500/20 text-teal-600 border-teal-500/40">
+            <CheckCircle2 className="w-4 h-4 sm:w-5 sm:h-5" />
+          </div>
+        </div>
+
+        {/* 4. UNKNOWN CARD */}
+        <div className={`rounded-xl sm:rounded-2xl p-3.5 sm:p-4 flex items-center justify-between border ${cardBaseStyle}`}>
+          <div className="min-w-0 flex-1">
+            <span className="text-[10px] sm:text-[11px] font-bold tracking-wider uppercase block truncate text-slate-500 dark:text-slate-400">
+              UNKNOWN
+            </span>
+            <div className="flex items-baseline gap-1.5 mt-0.5 sm:mt-1">
+              <span className="text-2xl sm:text-3xl font-mono font-black tabular-nums tracking-tight text-slate-600 dark:text-slate-300">
+                {unknownCount}
+              </span>
+              <span className="text-xs font-mono font-bold opacity-60">UNVERIFIED</span>
+            </div>
+            <span className="text-[10px] font-mono text-slate-500 dark:text-slate-400 block truncate mt-0.5">
+              Unreachable sensors
+            </span>
+          </div>
+          <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center border shadow-xs shrink-0 ml-1.5 bg-slate-500/15 text-slate-500 border-slate-500/30">
+            <HelpCircle className="w-4 h-4 sm:w-5 sm:h-5" />
+          </div>
+        </div>
+
+        {/* 5. GATE STATUS CARD (CLEAR GATE OPEN / GATE CLOSED INDICATOR) */}
+        <div
+          className={`col-span-2 sm:col-span-2 lg:col-span-1 rounded-xl sm:rounded-2xl p-3.5 sm:p-4 flex items-center justify-between border transition-all ${
+            isGateOpen
+              ? isLightMode
+                ? 'bg-emerald-50/90 border-emerald-300 text-slate-900'
+                : 'border-emerald-500/40 bg-emerald-950/20 text-white'
+              : isLightMode
+              ? 'bg-rose-50/90 border-rose-300 text-slate-900'
+              : 'border-rose-500/40 bg-rose-950/20 text-white'
+          }`}
+        >
+          <div className="min-w-0 flex-1">
+            <span
+              className={`text-[10px] sm:text-[11px] font-bold tracking-wider uppercase block truncate ${
+                isGateOpen ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
+              }`}
+            >
+              BARRIER GATE
+            </span>
+            <div className="flex items-baseline gap-1.5 mt-0.5 sm:mt-1">
+              <span
+                className={`text-xl sm:text-2xl font-mono font-black uppercase tracking-wider ${
+                  isGateOpen ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400 animate-pulse'
+                }`}
+              >
+                {effectiveGateStatus === 'OPEN' ? 'GATE OPEN' : 'GATE CLOSED'}
+              </span>
+            </div>
+            <span className="text-[10px] font-mono text-slate-500 dark:text-slate-400 block truncate mt-0.5">
+              {isGateOpen ? 'Entry barrier raised (0°)' : 'Entry barrier lowered (90°)'}
+            </span>
+          </div>
+          <div
+            className={`w-9 h-9 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center border shadow-xs shrink-0 ml-1.5 ${
+              isGateOpen
+                ? 'bg-emerald-500/20 text-emerald-600 border-emerald-500/40'
+                : 'bg-rose-500/20 text-rose-600 border-rose-500/40'
+            }`}
+          >
+            {isGateOpen ? <ShieldCheck className="w-4 h-4 sm:w-5 sm:h-5" /> : <ShieldAlert className="w-4 h-4 sm:w-5 sm:h-5" />}
+          </div>
         </div>
       </div>
     </div>
