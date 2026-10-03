@@ -16,6 +16,8 @@ import { BuzzerIndicator } from './components/BuzzerIndicator';
 import { SlotCard } from './components/SlotCard';
 import { SerialConsole } from './components/SerialConsole';
 import { ArduinoGuideModal } from './components/ArduinoGuideModal';
+import { ApkBuildModal } from './components/ApkBuildModal';
+import { OfflineIndicator } from './components/OfflineIndicator';
 import {
   serialManager,
   SerialLineParser,
@@ -94,6 +96,7 @@ export default function App() {
   const [logs, setLogs] = useState<SerialLogEntry[]>([]);
   const [selectedSlotId, setSelectedSlotId] = useState<number | undefined>(undefined);
   const [isArduinoGuideOpen, setIsArduinoGuideOpen] = useState(false);
+  const [isApkModalOpen, setIsApkModalOpen] = useState(false);
   const [portLabel, setPortLabel] = useState<string | undefined>(undefined);
   const [isParkingLotFullscreen, setIsParkingLotFullscreen] = useState(false);
 
@@ -446,6 +449,7 @@ export default function App() {
         onDisconnect={handleDisconnect}
         onExportSingleFileHtml={exportStandaloneHtmlFile}
         onOpenArduinoGuide={() => setIsArduinoGuideOpen(true)}
+        onOpenApkModal={() => setIsApkModalOpen(true)}
         isBrowserSupported={isBrowserSupported}
         portLabel={portLabel}
         isFullscreen={isParkingLotFullscreen}
@@ -559,6 +563,16 @@ export default function App() {
         onClose={() => setIsArduinoGuideOpen(false)}
         isLightMode={isLight}
       />
+
+      {/* Offline PWA & Native Android APK GitHub Actions Build Modal */}
+      <ApkBuildModal
+        isOpen={isApkModalOpen}
+        onClose={() => setIsApkModalOpen(false)}
+        isLightMode={isLight}
+      />
+
+      {/* Floating Offline Readiness & Connectivity Indicator */}
+      <OfflineIndicator />
     </div>
   );
 }

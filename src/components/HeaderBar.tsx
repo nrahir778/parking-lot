@@ -1,16 +1,17 @@
 import React from 'react';
 import { ConnectionMode, ThemeMode } from '../types';
+import { PWAInstallButton } from './PWAInstallButton';
 import {
   Usb,
   Bluetooth,
   Power,
   Download,
-  Car,
   Code,
   Sun,
   Moon,
   Maximize2,
   Minimize2,
+  Smartphone,
 } from 'lucide-react';
 
 interface HeaderBarProps {
@@ -22,6 +23,7 @@ interface HeaderBarProps {
   onDisconnect: () => void;
   onExportSingleFileHtml: () => void;
   onOpenArduinoGuide: () => void;
+  onOpenApkModal?: () => void;
   isBrowserSupported: boolean;
   portLabel?: string;
   isFullscreen?: boolean;
@@ -37,6 +39,7 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
   onDisconnect,
   onExportSingleFileHtml,
   onOpenArduinoGuide,
+  onOpenApkModal,
   portLabel,
   isFullscreen = false,
   onToggleFullscreen,
@@ -47,27 +50,34 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
 
   return (
     <header
-      className={`w-full border-b px-4 md:px-8 py-3 flex flex-wrap items-center justify-between gap-4 sticky top-0 z-40 backdrop-blur-xl transition-colors duration-300 ${
+      className={`w-full border-b px-4 md:px-8 py-2.5 sm:py-3 flex flex-wrap items-center justify-between gap-3 sm:gap-4 sticky top-0 z-40 backdrop-blur-xl transition-colors duration-300 ${
         isLight
           ? 'bg-white/90 border-slate-200 text-slate-900 shadow-xs'
           : 'glass-panel border-slate-800/80 text-white'
       }`}
     >
-      {/* Zone 1: Brand Wordmark */}
+      {/* Zone 1: Brand Wordmark with Custom School App Icon */}
       <div className="flex items-center gap-3">
-        <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-cyan-600 to-emerald-500 flex items-center justify-center text-white font-bold shadow-md">
-          <Car className="w-5 h-5 text-white" />
-        </div>
+        <img
+          src="/pwa-192x192.png"
+          alt="Smart Parking Logo"
+          className="w-10 h-10 rounded-xl border border-amber-400/50 shadow-md object-cover shrink-0"
+        />
         <div className="flex flex-col">
-          <span className="text-base font-bold tracking-tight flex items-center gap-2">
-            SmartPark 3D
-          </span>
+          <div className="flex items-center gap-1.5">
+            <span className="text-base font-black tracking-tight">
+              Smart Parking
+            </span>
+            <span className="hidden sm:inline px-1.5 py-0.2 rounded text-[10px] font-mono font-bold bg-amber-500/20 text-amber-500 border border-amber-500/30">
+              શાળા લાખાપર
+            </span>
+          </div>
           <span
             className={`text-[11px] font-mono ${
               isLight ? 'text-slate-500' : 'text-slate-400'
             }`}
           >
-            HC-05 Bluetooth & USB Serial · 9600 Baud
+            શ્રી સરકારી માધ્યમિક શાળા લાખાપર · 100% Offline APK
           </span>
         </div>
       </div>
@@ -106,6 +116,23 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
 
       {/* Zone 3: Primary Action Controls */}
       <div className="flex items-center flex-wrap gap-2">
+        {/* PWA Install Button (Chromium / iOS / Android) */}
+        <PWAInstallButton onOpenApkModal={onOpenApkModal} isLightMode={isLight} />
+
+        {/* Native Android APK Build & GitHub Actions Guide Button */}
+        <button
+          onClick={onOpenApkModal}
+          className={`px-3 py-1.5 rounded-xl text-xs font-mono flex items-center gap-1.5 transition-all whitespace-nowrap border shadow-xs ${
+            isLight
+              ? 'bg-slate-100 hover:bg-slate-200 text-slate-800 border-slate-300'
+              : 'glass-panel text-cyan-300 hover:text-white border-cyan-500/30'
+          }`}
+          title="Build & Download Native Android APK using GitHub Actions"
+        >
+          <Smartphone className="w-3.5 h-3.5 text-cyan-400" />
+          <span className="hidden sm:inline">Build APK</span>
+        </button>
+
         {/* Theme Switcher Toggle (Light / Dark) */}
         <button
           onClick={onToggleTheme}
@@ -130,7 +157,7 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
           title="View Arduino Uno code (.ino), HC-05 wiring diagram, and Windows 11 setup"
         >
           <Code className="w-3.5 h-3.5 text-cyan-500" />
-          <span>Code & Wiring</span>
+          <span>Code &amp; Wiring</span>
         </button>
 
         {/* Connect / Disconnect Buttons */}
@@ -203,3 +230,4 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
     </header>
   );
 };
+

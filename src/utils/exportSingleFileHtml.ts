@@ -678,12 +678,21 @@ export function exportStandaloneHtmlFile(): void {
       }
 
       // 2. Slot telemetry line
-      const match = line.match(/SLOT\\s*([1-3])\\s*\\|\\s*Dist(?:ance)?:\\s*([\\d.]+)\\s*cm\\s*\\|\\s*(?:FSR|Pressure):\\s*(\\d+)\\s*\\|\\s*STATUS:\\s*(OCCUPIED|AVAILABLE|VACANT)/i);
-      if (match) {
-        const id = parseInt(match[1]);
-        const dist = parseFloat(match[2]);
-        const fsr = parseInt(match[3]);
-        const status = match[4].toUpperCase() === 'OCCUPIED' ? 'OCCUPIED' : 'AVAILABLE';
+      const slotMatch = line.match(/(?:LOT|SLOT)\\s*([1-3])/i);
+      const distMatch = line.match(/(?:Distance|Dist):\\s*([\\d.]+)/i);
+      const statMatch = line.match(/(?:Status|STATUS):\\s*(EMPTY|OCCUPIED|AVAILABLE|VACANT)/i);
+      const fsrMatch = line.match(/(?:FSR|Pressure):\\s*(\\d+)/i);
+
+      if (slotMatch) {
+        const id = parseInt(slotMatch[1]);
+        const dist = distMatch ? parseFloat(distMatch[1]) : 0;
+        const fsr = fsrMatch ? parseInt(fsrMatch[1]) : 0;
+        let status = 'AVAILABLE';
+        if (statMatch) {
+          status = statMatch[1].toUpperCase() === 'OCCUPIED' ? 'OCCUPIED' : 'AVAILABLE';
+        } else if (fsrMatch) {
+          status = (dist <= 3.0 && fsr >= 15) ? 'OCCUPIED' : 'AVAILABLE';
+        }
         
         const prevStatus = slots[id].status;
         slots[id].distance = dist;
