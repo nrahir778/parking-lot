@@ -2,44 +2,59 @@ import sharp from 'sharp';
 import fs from 'fs';
 import path from 'path';
 
+// Check for user-provided icon in assets/icon.png first, otherwise fall back to public/icon.svg
+const assetPngPath = path.resolve('assets/icon.png');
 const svgPath = path.resolve('public/icon.svg');
-const svgBuffer = fs.readFileSync(svgPath);
+
+let iconBuffer;
+if (fs.existsSync(assetPngPath) && fs.statSync(assetPngPath).size > 0) {
+  console.log('Using uploaded icon asset from assets/icon.png');
+  iconBuffer = fs.readFileSync(assetPngPath);
+  try {
+    fs.copyFileSync(assetPngPath, path.resolve('public/icon.png'));
+  } catch (e) {
+    console.warn('Could not copy to public/icon.png:', e);
+  }
+} else {
+  console.log('Falling back to default SVG icon from public/icon.svg');
+  iconBuffer = fs.readFileSync(svgPath);
+}
 
 async function generate() {
-  console.log('Generating PWA and Android app icons from public/icon.svg...');
+  console.log('Generating PWA and Android app icons from source icon...');
 
   // 1. 192x192 PNG
-  await sharp(svgBuffer)
+  await sharp(iconBuffer)
     .resize(192, 192)
     .png()
     .toFile('public/pwa-192x192.png');
   console.log('Generated public/pwa-192x192.png');
 
   // 2. 512x512 PNG
-  await sharp(svgBuffer)
+  await sharp(iconBuffer)
     .resize(512, 512)
     .png()
     .toFile('public/pwa-512x512.png');
   console.log('Generated public/pwa-512x512.png');
 
   // 3. Apple Touch Icon 180x180
-  await sharp(svgBuffer)
+  await sharp(iconBuffer)
     .resize(180, 180)
     .png()
     .toFile('public/apple-touch-icon.png');
   console.log('Generated public/apple-touch-icon.png');
 
   // 4. Favicon 64x64 PNG
-  await sharp(svgBuffer)
+  await sharp(iconBuffer)
     .resize(64, 64)
     .png()
     .toFile('public/favicon.png');
   console.log('Generated public/favicon.png');
 
-  // 5. Maskable 512x512 (with 12% safe zone padding and background)
+  // 5. Maskable 512x512 (with safe zone padding and background)
   const innerSize = Math.round(512 * 0.76); // ~390px
-  const innerBuffer = await sharp(svgBuffer)
-    .resize(innerSize, innerSize)
+  const innerBuffer = await sharp(iconBuffer)
+    .resize(innerSize, innerSize, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
     .png()
     .toBuffer();
 

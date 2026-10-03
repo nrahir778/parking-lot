@@ -78,25 +78,28 @@ define(['./workbox-afac4cd2'], (function (workbox) { 'use strict';
    */
   workbox.precacheAndRoute([{
     "url": "pwa-maskable-512x512.png",
-    "revision": "57633a617d974a17f29907a7971a1a8e"
+    "revision": "40f14d2d4abc209ea0b39d8926dabc80"
   }, {
     "url": "pwa-512x512.png",
-    "revision": "bbe096ca5e5b3ac849a2fb1873d3832d"
+    "revision": "7acc59951d9e508bb542e2aeff6a4d63"
   }, {
     "url": "pwa-192x192.png",
-    "revision": "eecd6a2442c2f311b47e702a19b8ace9"
+    "revision": "40e176973051b0e306118c2150036423"
   }, {
     "url": "index.html",
-    "revision": "15f382d51d03c98808a6f806db730e6c"
+    "revision": "e8a3e10939ba137e341b9e6ab76703fa"
   }, {
     "url": "icon.svg",
     "revision": "9ae4437497eb94ec0bbd67724e2615e3"
   }, {
+    "url": "icon.png",
+    "revision": "66ddf38fd5b6428d4591d763ecd91615"
+  }, {
     "url": "favicon.png",
-    "revision": "b41cda2f7ea7181ad081b1d6cfe277d8"
+    "revision": "03985582659cec29235e7540efcf4fbc"
   }, {
     "url": "apple-touch-icon.png",
-    "revision": "f7906e3befa10706dbb6494ee42795f5"
+    "revision": "8760da4834b43f93d77e80848f634160"
   }, {
     "url": "assets/workbox-window.prod.es5-Bd17z0YL.js",
     "revision": null
@@ -108,22 +111,25 @@ define(['./workbox-afac4cd2'], (function (workbox) { 'use strict';
     "revision": null
   }, {
     "url": "apple-touch-icon.png",
-    "revision": "f7906e3befa10706dbb6494ee42795f5"
+    "revision": "8760da4834b43f93d77e80848f634160"
   }, {
     "url": "favicon.png",
-    "revision": "b41cda2f7ea7181ad081b1d6cfe277d8"
+    "revision": "03985582659cec29235e7540efcf4fbc"
+  }, {
+    "url": "icon.png",
+    "revision": "66ddf38fd5b6428d4591d763ecd91615"
   }, {
     "url": "icon.svg",
     "revision": "9ae4437497eb94ec0bbd67724e2615e3"
   }, {
     "url": "pwa-192x192.png",
-    "revision": "eecd6a2442c2f311b47e702a19b8ace9"
+    "revision": "40e176973051b0e306118c2150036423"
   }, {
     "url": "pwa-512x512.png",
-    "revision": "bbe096ca5e5b3ac849a2fb1873d3832d"
+    "revision": "7acc59951d9e508bb542e2aeff6a4d63"
   }, {
     "url": "pwa-maskable-512x512.png",
-    "revision": "57633a617d974a17f29907a7971a1a8e"
+    "revision": "40f14d2d4abc209ea0b39d8926dabc80"
   }, {
     "url": "manifest.webmanifest",
     "revision": "162f8ec3d7bdbfd7e4a2a297fd0fd8f5"
