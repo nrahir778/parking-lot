@@ -18,6 +18,10 @@ import { SerialConsole } from './components/SerialConsole';
 import { ArduinoGuideModal } from './components/ArduinoGuideModal';
 import { ApkBuildModal } from './components/ApkBuildModal';
 import { OfflineIndicator } from './components/OfflineIndicator';
+import { BluetoothConnectModal } from './components/BluetoothConnectModal';
+import { NotificationSettingsModal } from './components/NotificationSettingsModal';
+import { InAppToastContainer } from './components/InAppToastContainer';
+import { notificationService } from './services/notificationService';
 import {
   serialManager,
   SerialLineParser,
@@ -97,6 +101,8 @@ export default function App() {
   const [selectedSlotId, setSelectedSlotId] = useState<number | undefined>(undefined);
   const [isArduinoGuideOpen, setIsArduinoGuideOpen] = useState(false);
   const [isApkModalOpen, setIsApkModalOpen] = useState(false);
+  const [isBluetoothModalOpen, setIsBluetoothModalOpen] = useState(false);
+  const [isNotificationModalOpen, setIsNotificationModalOpen] = useState(false);
   const [portLabel, setPortLabel] = useState<string | undefined>(undefined);
   const [isParkingLotFullscreen, setIsParkingLotFullscreen] = useState(false);
 
@@ -222,9 +228,14 @@ export default function App() {
           const prevSlot = currentSlots.find((s) => s.id === slotId);
           const wasEmpty = prevSlot ? (prevSlot.status === 'EMPTY' || prevSlot.status === 'AVAILABLE') : false;
 
-          // If a slot transitions to OCCUPIED, trigger buzzer pulse for that slot
+          // If a slot transitions to OCCUPIED, trigger buzzer pulse & useful notification
           if (wasEmpty && status === 'OCCUPIED') {
             triggerBuzzer(slotId);
+            const occupiedCount = currentSlots.filter((s) => (s.id === slotId ? true : s.status === 'OCCUPIED')).length;
+            notificationService.notifyVehicleParked(slotId, occupiedCount);
+          } else if (prevSlot?.status === 'OCCUPIED' && (status === 'EMPTY' || status === 'AVAILABLE')) {
+            const freeCount = currentSlots.filter((s) => (s.id === slotId ? true : (s.status === 'EMPTY' || s.status === 'AVAILABLE'))).length;
+            notificationService.notifySpotAvailable(slotId, freeCount);
           }
 
           // Update individual slot card as its line arrives. Do not reset other cards!
@@ -263,6 +274,9 @@ export default function App() {
 
         // Set Hardware Buzzer State
         const allOccupied = parsed.data.totalOccupied >= parsed.data.totalSlots;
+        if (allOccupied) {
+          notificationService.notifyParkingFull();
+        }
         setBuzzerState((prev) => ({
           ...prev,
           hardwareBuzzerOn: allOccupied || isClosed,
@@ -326,6 +340,7 @@ export default function App() {
       setPortLabel(detectedLabel);
       setConnectionMode('connected_usb');
       addLog(`[SYSTEM] Connected to ${detectedLabel} @ 9600 baud. Receiving live hardware data.`, 'system');
+      notificationService.notifyHardwareConnected(detectedLabel);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'USB connection failed.';
       setErrorMessage(msg);
@@ -335,72 +350,85 @@ export default function App() {
     }
   };
 
-  // Connect via HC-05 Bluetooth Module
-  const handleConnectBluetooth = async () => {
+  // Connect via HC-05 Bluetooth Module (Native Capacitor BLE or Web Bluetooth)
+  const handleConnectBluetooth = async (targetDeviceId?: string) => {
     setErrorMessage(null);
     try {
       setConnectionMode('connecting');
-      addLog('[SYSTEM] Requesting HC-05 Bluetooth device...', 'system');
+      addLog('[SYSTEM] Opening HC-05 Bluetooth connection...', 'system');
 
-      // Attempt direct Web Bluetooth or Bluetooth COM port
-      if (HC05BluetoothManager.isSupported()) {
-        hc05Bluetooth.setCallbacks(
-          (line) => {
-            handleIncomingSerialLine(line);
-          },
-          (error) => {
-            if (error) {
-              addLog(`[ERROR] Bluetooth disconnected: ${error.message}`, 'error');
-              setErrorMessage(error.message);
-            } else {
-              addLog('[SYSTEM] Bluetooth disconnected.', 'system');
-            }
-            setConnectionMode('disconnected');
-            setPortLabel(undefined);
-          }
-        );
-
-        try {
-          await hc05Bluetooth.connect();
-          const devName = hc05Bluetooth.getDeviceName();
-          setPortLabel(devName);
-          setConnectionMode('connected_bt');
-          addLog(`[SYSTEM] Connected to ${devName} wirelessly. Receiving live hardware data.`, 'system');
-          return;
-        } catch (bleErr: any) {
-          // If GATT fails (Classic Bluetooth SPP on Windows 11), prompt connecting via paired Bluetooth COM port
-          addLog(`[SYSTEM] Direct BLE fallback: Trying Paired Bluetooth Serial Port...`, 'system');
-        }
-      }
-
-      // Windows 11 Classic HC-05: Pair HC-05 via Windows Settings, then connect to its COM port via Web Serial
-      serialManager.setCallbacks(
+      hc05Bluetooth.setCallbacks(
         (line) => {
           handleIncomingSerialLine(line);
         },
         (error) => {
           if (error) {
-            addLog(`[ERROR] Bluetooth COM disconnected: ${error.message}`, 'error');
+            addLog(`[ERROR] Bluetooth disconnected: ${error.message}`, 'error');
             setErrorMessage(error.message);
+            notificationService.notifyHardwareDisconnected(error.message);
           } else {
-            addLog('[SYSTEM] Bluetooth COM disconnected.', 'system');
+            addLog('[SYSTEM] Bluetooth disconnected.', 'system');
+            notificationService.notifyHardwareDisconnected();
           }
           setConnectionMode('disconnected');
           setPortLabel(undefined);
         }
       );
 
-      await serialManager.connect(9600);
-      setPortLabel('HC-05 (Bluetooth COM @ 9600)');
+      await hc05Bluetooth.connect(targetDeviceId);
+      const devName = hc05Bluetooth.getDeviceName();
+      setPortLabel(devName);
       setConnectionMode('connected_bt');
-      addLog('[SYSTEM] Connected to HC-05 via Bluetooth COM port @ 9600 baud.', 'system');
+      addLog(`[SYSTEM] Connected to ${devName} wirelessly. Receiving live hardware data.`, 'system');
+      notificationService.notifyHardwareConnected(devName);
+      setIsBluetoothModalOpen(false);
     } catch (err: unknown) {
+      // Fallback for Windows 11 Classic HC-05 SPP paired COM port
+      try {
+        serialManager.setCallbacks(
+          (line) => {
+            handleIncomingSerialLine(line);
+          },
+          (error) => {
+            if (error) {
+              addLog(`[ERROR] Bluetooth COM disconnected: ${error.message}`, 'error');
+              setErrorMessage(error.message);
+              notificationService.notifyHardwareDisconnected(error.message);
+            } else {
+              addLog('[SYSTEM] Bluetooth COM disconnected.', 'system');
+              notificationService.notifyHardwareDisconnected();
+            }
+            setConnectionMode('disconnected');
+            setPortLabel(undefined);
+          }
+        );
+
+        await serialManager.connect(9600);
+        setPortLabel('HC-05 (Bluetooth COM @ 9600)');
+        setConnectionMode('connected_bt');
+        addLog('[SYSTEM] Connected to HC-05 via Bluetooth COM port @ 9600 baud.', 'system');
+        notificationService.notifyHardwareConnected('HC-05 Bluetooth COM');
+        setIsBluetoothModalOpen(false);
+        return;
+      } catch {
+        // Fallback did not apply
+      }
+
       const msg = err instanceof Error ? err.message : 'Bluetooth connection failed.';
       setErrorMessage(msg);
       addLog(`[SYSTEM] Bluetooth Connection aborted: ${msg}`, 'error');
       setConnectionMode('disconnected');
       setPortLabel(undefined);
+      throw err;
     }
+  };
+
+  const handleInjectSampleData = () => {
+    addLog('[TEST] Injected Arduino Uno telemetry stream', 'system');
+    handleIncomingSerialLine('Lot 1 | Distance: 3.1 cm | Status: EMPTY');
+    handleIncomingSerialLine('Lot 2 | Distance: 2.3 cm | Status: OCCUPIED');
+    handleIncomingSerialLine('Lot 3 | Distance: 4.1 cm | Status: EMPTY');
+    handleIncomingSerialLine('TOTAL OCCUPIED: 1/3 | EMPTY: 2 | UNKNOWN: 0 | AVAILABLE: 2 | GATE: OPEN');
   };
 
   const handleDisconnect = async () => {
@@ -416,6 +444,7 @@ export default function App() {
       }
       setConnectionMode('disconnected');
       setPortLabel(undefined);
+      notificationService.notifyHardwareDisconnected();
       addLog('[SYSTEM] Disconnected from hardware.', 'system');
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Error closing connection';
@@ -445,16 +474,20 @@ export default function App() {
         theme={theme}
         onToggleTheme={toggleTheme}
         onConnectUSB={handleConnectUSB}
-        onConnectBluetooth={handleConnectBluetooth}
+        onConnectBluetooth={() => setIsBluetoothModalOpen(true)}
         onDisconnect={handleDisconnect}
         onExportSingleFileHtml={exportStandaloneHtmlFile}
         onOpenArduinoGuide={() => setIsArduinoGuideOpen(true)}
         onOpenApkModal={() => setIsApkModalOpen(true)}
+        onOpenNotificationModal={() => setIsNotificationModalOpen(true)}
         isBrowserSupported={isBrowserSupported}
         portLabel={portLabel}
         isFullscreen={isParkingLotFullscreen}
         onToggleFullscreen={() => setIsParkingLotFullscreen((prev) => !prev)}
       />
+
+      {/* In-App Live Notification Toast HUD */}
+      <InAppToastContainer isLightMode={isLight} />
 
       {/* Connection Guidance Banner */}
       {connectionMode === 'disconnected' && (
@@ -481,7 +514,7 @@ export default function App() {
               </button>
               <span className="opacity-30">|</span>
               <button
-                onClick={handleConnectBluetooth}
+                onClick={() => setIsBluetoothModalOpen(true)}
                 className="font-mono text-[11px] font-semibold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
               >
                 <Bluetooth className="w-3 h-3" /> Connect HC-05
@@ -568,6 +601,26 @@ export default function App() {
       <ApkBuildModal
         isOpen={isApkModalOpen}
         onClose={() => setIsApkModalOpen(false)}
+        isLightMode={isLight}
+      />
+
+      {/* Interactive Bluetooth Connect & Pairing Modal */}
+      <BluetoothConnectModal
+        isOpen={isBluetoothModalOpen}
+        onClose={() => setIsBluetoothModalOpen(false)}
+        connectionMode={connectionMode}
+        portLabel={portLabel}
+        onConnectBluetooth={handleConnectBluetooth}
+        onDisconnect={handleDisconnect}
+        onConnectUSB={handleConnectUSB}
+        onInjectTestStream={handleInjectSampleData}
+        isLightMode={isLight}
+      />
+
+      {/* Useful Notification Settings & Device Permissions Modal */}
+      <NotificationSettingsModal
+        isOpen={isNotificationModalOpen}
+        onClose={() => setIsNotificationModalOpen(false)}
         isLightMode={isLight}
       />
 

@@ -12,6 +12,7 @@ import {
   Maximize2,
   Minimize2,
   Smartphone,
+  BellRing,
 } from 'lucide-react';
 
 interface HeaderBarProps {
@@ -24,6 +25,7 @@ interface HeaderBarProps {
   onExportSingleFileHtml: () => void;
   onOpenArduinoGuide: () => void;
   onOpenApkModal?: () => void;
+  onOpenNotificationModal?: () => void;
   isBrowserSupported: boolean;
   portLabel?: string;
   isFullscreen?: boolean;
@@ -40,6 +42,7 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
   onExportSingleFileHtml,
   onOpenArduinoGuide,
   onOpenApkModal,
+  onOpenNotificationModal,
   portLabel,
   isFullscreen = false,
   onToggleFullscreen,
@@ -132,6 +135,22 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
           <Smartphone className="w-3.5 h-3.5 text-cyan-400" />
           <span className="hidden sm:inline">Build APK</span>
         </button>
+
+        {/* Notification Settings Toggle */}
+        {onOpenNotificationModal && (
+          <button
+            onClick={onOpenNotificationModal}
+            className={`p-2 rounded-xl border transition-colors flex items-center justify-center relative ${
+              isLight
+                ? 'bg-slate-100 hover:bg-slate-200 text-slate-800 border-slate-300'
+                : 'glass-panel text-cyan-300 hover:text-white border-slate-700'
+            }`}
+            title="Notification Settings (Parking Full & Spot Free Alerts)"
+          >
+            <BellRing className="w-4 h-4 text-cyan-400" />
+            <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-cyan-400 ring-2 ring-slate-900" />
+          </button>
+        )}
 
         {/* Theme Switcher Toggle (Light / Dark) */}
         <button
