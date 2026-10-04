@@ -64,13 +64,13 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
             <span className="text-sm sm:text-base font-black tracking-tight whitespace-nowrap">
               Smart Parking
             </span>
-            <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30 whitespace-nowrap shrink-0">
+            <span className="px-2 py-0.5 rounded-lg text-[11px] font-gujarati font-extrabold bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30 whitespace-nowrap shrink-0">
               લાખાપર
             </span>
           </div>
           <span
-            className={`text-[10px] font-sans truncate ${
-              isLight ? 'text-slate-500' : 'text-slate-400'
+            className={`text-[11px] font-gujarati font-medium truncate max-w-[140px] xs:max-w-[200px] sm:max-w-xs ${
+              isLight ? 'text-slate-600' : 'text-slate-300'
             }`}
           >
             શ્રી સરકારી માધ્યમિક શાળા લાખાપર

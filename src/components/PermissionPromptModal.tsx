@@ -97,7 +97,11 @@ export const PermissionPromptModal: React.FC<PermissionPromptModalProps> = ({
         </button>
 
         {/* Header with App Icon */}
-        <div className="flex items-center gap-3.5 pb-4 border-b border-white/10">
+        <div
+          className={`flex items-center gap-3.5 pb-4 border-b ${
+            isLightMode ? 'border-slate-200' : 'border-white/10'
+          }`}
+        >
           <img
             src="/pwa-192x192.png"
             alt="Smart Parking Logo"

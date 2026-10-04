@@ -46,7 +46,7 @@ const INITIAL_SLOTS: SlotData[] = [
     lastUpdated: 0,
     hasHardwareReading: false,
     currentCharge: 0,
-    totalCollection: 140, // ₹140 accumulated so far
+    totalCollection: 0, // Clean start: no demo testing charges
     parkedSince: null,
     car: {
       bodyColor: '#1e3a8a', // Metallic Sapphire Blue
@@ -68,7 +68,7 @@ const INITIAL_SLOTS: SlotData[] = [
     lastUpdated: 0,
     hasHardwareReading: false,
     currentCharge: 0,
-    totalCollection: 90, // ₹90 accumulated so far
+    totalCollection: 0, // Clean start: no demo testing charges
     parkedSince: null,
     car: {
       bodyColor: '#e2e8f0', // Pearl Titanium Silver
@@ -90,7 +90,7 @@ const INITIAL_SLOTS: SlotData[] = [
     lastUpdated: 0,
     hasHardwareReading: false,
     currentCharge: 0,
-    totalCollection: 165, // ₹165 accumulated so far
+    totalCollection: 0, // Clean start: no demo testing charges
     parkedSince: null,
     car: {
       bodyColor: '#dc2626', // Sport Crimson Metallic
@@ -103,36 +103,9 @@ const INITIAL_SLOTS: SlotData[] = [
   },
 ];
 
-const INITIAL_RECEIPTS: ParkingReceipt[] = [
-  {
-    id: 'rc-101',
-    slotId: 1,
-    slotName: 'LOT 1',
-    plate: 'GJ 12 AK 4589',
-    modelName: 'Executive Sedan',
-    entryTime: Date.now() - 480000,
-    exitTime: Date.now() - 360000,
-    durationSeconds: 120, // 2 mins
-    amountPaid: 20.0, // ₹20 (₹10/min)
-    timestamp: Date.now() - 360000,
-  },
-  {
-    id: 'rc-102',
-    slotId: 3,
-    slotName: 'LOT 3',
-    plate: 'GJ 12 CR 8831',
-    modelName: 'Sport Coupe',
-    entryTime: Date.now() - 300000,
-    exitTime: Date.now() - 150000,
-    durationSeconds: 150, // 2.5 mins
-    amountPaid: 25.0, // ₹25 (₹10/min)
-    timestamp: Date.now() - 150000,
-  },
-];
-
 export default function App() {
   const [slots, setSlots] = useState<SlotData[]>(INITIAL_SLOTS);
-  const [receipts, setReceipts] = useState<ParkingReceipt[]>(INITIAL_RECEIPTS);
+  const [receipts, setReceipts] = useState<ParkingReceipt[]>([]); // Clean start: no fake receipts
   const [isReceiptsModalOpen, setIsReceiptsModalOpen] = useState(false);
 
   const [arduinoSummary, setArduinoSummary] = useState<ArduinoSummaryData | null>(null);
@@ -149,6 +122,8 @@ export default function App() {
   const [isPermissionPromptOpen, setIsPermissionPromptOpen] = useState(false);
   const [portLabel, setPortLabel] = useState<string | undefined>(undefined);
   const [isParkingLotFullscreen, setIsParkingLotFullscreen] = useState(false);
+
+  const isConnected = connectionMode === 'connected_usb' || connectionMode === 'connected_bt';
 
   // Check on first app launch if permissions were granted
   useEffect(() => {
@@ -261,16 +236,21 @@ export default function App() {
   }, []);
 
   // AUTOMATIC PARKING CHARGE CALCULATION TIMER:
-  // Every 3 seconds, update the live charge for all parked cars (Rate: ₹10 / minute)
+  // ONLY starts counting after Arduino is connected with Bluetooth (or USB)
   useEffect(() => {
+    // If not connected to Arduino hardware, DO NOT run the billing counter!
+    if (!isConnected) {
+      return;
+    }
+
     const interval = setInterval(() => {
       setSlots((currentSlots) => {
         let changed = false;
         const now = Date.now();
 
         const updated = currentSlots.map((slot) => {
-          if (slot.status === 'OCCUPIED') {
-            const parkedSince = slot.parkedSince || (now - 3000);
+          if (slot.status === 'OCCUPIED' && slot.hasHardwareReading) {
+            const parkedSince = slot.parkedSince || now;
             const elapsedSeconds = Math.max(0, Math.floor((now - parkedSince) / 1000));
             // Rate: ₹10 per minute = (elapsedSeconds / 60) * 10
             const computedCharge = Math.round((elapsedSeconds / 60) * PARKING_RATE_PER_MINUTE * 100) / 100;
@@ -292,7 +272,7 @@ export default function App() {
     }, CHARGE_UPDATE_INTERVAL_MS);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [isConnected]);
 
   // Helper to settle a vehicle's departure and cut money automatically
   const settleSlotDeparture = useCallback(
@@ -301,7 +281,7 @@ export default function App() {
       if (!slot) return null;
 
       const now = Date.now();
-      const entryTime = slot.parkedSince || (now - 30000);
+      const entryTime = slot.parkedSince || now;
       const durationSeconds = Math.max(1, Math.floor((now - entryTime) / 1000));
       // Final amount: at least ₹0.50 (minimum 3 seconds), or computed charge
       const computedFee = Math.round((durationSeconds / 60) * PARKING_RATE_PER_MINUTE * 100) / 100;
@@ -358,7 +338,7 @@ export default function App() {
           const wasOccupied = prevSlot ? prevSlot.status === 'OCCUPIED' : false;
 
           // If a slot transitions from OCCUPIED to EMPTY: CAR DEPARTED!
-          // Automatically cut money, log receipt, and reset active charge to 0 for the next car!
+          // Automatically cut money, log receipt, and reset active charge to 0 for next car!
           if (wasOccupied && (status === 'EMPTY' || status === 'AVAILABLE')) {
             const departure = settleSlotDeparture(slotId, currentSlots);
             const fee = departure?.finalAmount || prevSlot?.currentCharge || 0;
@@ -378,7 +358,7 @@ export default function App() {
                   hasHardwareReading: true,
                   currentCharge: 0, // Reset to 0 for next car!
                   parkedSince: null,
-                  totalCollection: (s.totalCollection || 0) + fee, // Added to total collection
+                  totalCollection: (s.totalCollection || 0) + fee,
                   lastDeduction: departure?.receipt || null,
                 };
               }
@@ -387,7 +367,7 @@ export default function App() {
           }
 
           // If a slot transitions from EMPTY to OCCUPIED: NEW CAR ARRIVED!
-          // Start live meter from 0 and record entry timestamp!
+          // Start live counting from 0 now that Bluetooth is connected!
           if (wasEmpty && status === 'OCCUPIED') {
             triggerBuzzer(slotId);
             const occupiedCount = currentSlots.filter((s) => (s.id === slotId ? true : s.status === 'OCCUPIED')).length;
@@ -404,7 +384,7 @@ export default function App() {
                   fsr: fsr ?? s.fsr,
                   lastUpdated: Date.now(),
                   hasHardwareReading: true,
-                  currentCharge: 0, // Start fresh at 0
+                  currentCharge: 0, // Starts at 0
                   parkedSince: Date.now(),
                 };
               }
@@ -593,66 +573,6 @@ export default function App() {
     }
   };
 
-  const handleInjectSampleData = () => {
-    addLog('[TEST] Injected Arduino Uno telemetry stream', 'system');
-    handleIncomingSerialLine('Lot 1 | Distance: 3.1 cm | Status: EMPTY');
-    handleIncomingSerialLine('Lot 2 | Distance: 2.3 cm | Status: OCCUPIED');
-    handleIncomingSerialLine('Lot 3 | Distance: 4.1 cm | Status: EMPTY');
-    handleIncomingSerialLine('TOTAL OCCUPIED: 1/3 | EMPTY: 2 | UNKNOWN: 0 | AVAILABLE: 2 | GATE: OPEN');
-  };
-
-  // Interactive toggle function to simulate car parking / exiting and auto-deduction
-  const handleToggleSlotStatus = (slotId: SlotId) => {
-    setSlots((currentSlots) => {
-      const target = currentSlots.find((s) => s.id === slotId);
-      if (!target) return currentSlots;
-
-      const isNowOccupied = target.status === 'OCCUPIED';
-
-      if (isNowOccupied) {
-        // CAR EXITS: Auto-deduct parking fee, update total collection, reset to 0 for next car!
-        const departure = settleSlotDeparture(slotId, currentSlots);
-        const fee = departure?.finalAmount || target.currentCharge || 5;
-
-        const updated = currentSlots.map((s) => {
-          if (s.id === slotId) {
-            return {
-              ...s,
-              status: 'AVAILABLE' as const,
-              distance: 35.0,
-              currentCharge: 0, // Resets to 0 for next car!
-              parkedSince: null,
-              totalCollection: (s.totalCollection || 0) + fee,
-              lastDeduction: departure?.receipt || null,
-              lastUpdated: Date.now(),
-            };
-          }
-          return s;
-        });
-        syncGateAndBuzzer(updated);
-        return updated;
-      } else {
-        // NEW CAR ARRIVES: starts from 0 at ₹10/min
-        triggerBuzzer(slotId);
-        const updated = currentSlots.map((s) => {
-          if (s.id === slotId) {
-            return {
-              ...s,
-              status: 'OCCUPIED' as const,
-              distance: 4.5,
-              currentCharge: 0, // Starts at 0
-              parkedSince: Date.now(),
-              lastUpdated: Date.now(),
-            };
-          }
-          return s;
-        });
-        syncGateAndBuzzer(updated);
-        return updated;
-      }
-    });
-  };
-
   const handleDisconnect = async () => {
     try {
       if (connectionMode === 'connected_usb') {
@@ -667,7 +587,7 @@ export default function App() {
       setConnectionMode('disconnected');
       setPortLabel(undefined);
       notificationService.notifyHardwareDisconnected();
-      addLog('[SYSTEM] Disconnected from hardware.', 'system');
+      addLog('[SYSTEM] Disconnected from hardware. Meter paused.', 'system');
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Error closing connection';
       addLog(`[ERROR] ${msg}`, 'error');
@@ -707,9 +627,9 @@ export default function App() {
       {/* In-App Live Notification Toast HUD */}
       <InAppToastContainer isLightMode={isLight} />
 
-      {/* Main Container */}
-      <main className="flex-1 w-full max-w-7xl mx-auto px-3 sm:px-6 md:px-8 py-4 sm:py-6 space-y-5 sm:space-y-6">
-        {/* Top Summary Bar */}
+      {/* Main Container - Optimized Spacing for Mobile Screens */}
+      <main className="flex-1 w-full max-w-7xl mx-auto px-2.5 sm:px-6 md:px-8 py-3 sm:py-6 space-y-3 sm:space-y-5">
+        {/* Top Summary Bar (2x2 Grid on Mobile) */}
         <TopSummary
           slots={slots}
           arduinoSummary={arduinoSummary}
@@ -723,19 +643,19 @@ export default function App() {
           onOpenReceipts={() => setIsReceiptsModalOpen(true)}
         />
 
-        {/* 3D Isometric Parking Yard (Realistic Cars, Status-Bar-Safe Fullscreen) */}
+        {/* 3D Isometric Parking Yard (Sleek Mobile Controls & Realistic Graphics) */}
         <IsometricParkingLot
           slots={slots}
           gateState={gateState}
           hardwareBuzzerOn={buzzerState.hardwareBuzzerOn}
           onSlotClick={(id) => {
             setSelectedSlotId(id);
-            handleToggleSlotStatus(id);
           }}
           selectedSlotId={selectedSlotId}
           isLightMode={isLight}
           isFullscreen={isParkingLotFullscreen}
           onToggleFullscreen={(val) => setIsParkingLotFullscreen(val)}
+          isConnected={isConnected}
         />
 
         {/* Common Buzzer Indicator */}
@@ -746,14 +666,14 @@ export default function App() {
           isLightMode={isLight}
         />
 
-        {/* Live Slot Cards (Price & Live 3s Billing, Total Collection, Proximity Gauge) */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Live Slot Cards (Price, Live 3s Billing, Total Collection, Proximity Gauge) */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 sm:gap-4">
           {slots.map((slot) => (
             <SlotCard
               key={slot.id}
               slot={slot}
+              isConnected={isConnected}
               isLightMode={isLight}
-              onToggleSlotStatus={handleToggleSlotStatus}
             />
           ))}
         </div>
@@ -772,12 +692,16 @@ export default function App() {
 
       {/* Clean, Minimal Footer */}
       <footer
-        className={`w-full border-t py-3.5 px-4 text-center text-xs font-mono transition-colors ${
+        className={`w-full border-t py-3 px-4 text-center text-xs font-mono transition-colors ${
           isLight ? 'border-slate-200 text-slate-500 bg-white' : 'border-slate-800/80 text-slate-500 bg-[#080c14]'
         }`}
       >
         <div className="flex flex-wrap items-center justify-center gap-2">
-          <span>Smart Parking · શ્રી સરકારી માધ્યમિક શાળા લાખાપર</span>
+          <span>Smart Parking</span>
+          <span className="opacity-30">·</span>
+          <span className="font-gujarati font-bold text-amber-500">લાખાપર પાર્કિંગ વિસ્તાર</span>
+          <span className="opacity-30">·</span>
+          <span className="font-gujarati text-slate-500">શ્રી સરકારી માધ્યમિક શાળા લાખાપર</span>
           <span className="opacity-30">·</span>
           <button
             onClick={() => downloadArduinoInoFile()}
@@ -827,7 +751,6 @@ export default function App() {
         onConnectBluetooth={handleConnectBluetooth}
         onDisconnect={handleDisconnect}
         onConnectUSB={handleConnectUSB}
-        onInjectTestStream={handleInjectSampleData}
         isLightMode={isLight}
       />
 

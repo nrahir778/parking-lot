@@ -27,7 +27,6 @@ interface BluetoothConnectModalProps {
   onConnectBluetooth: (deviceId?: string) => Promise<void>;
   onDisconnect: () => Promise<void>;
   onConnectUSB: () => Promise<void>;
-  onInjectTestStream?: () => void;
   isLightMode?: boolean;
 }
 
@@ -39,7 +38,6 @@ export const BluetoothConnectModal: React.FC<BluetoothConnectModalProps> = ({
   onConnectBluetooth,
   onDisconnect,
   onConnectUSB,
-  onInjectTestStream,
   isLightMode = false,
 }) => {
   const [isScanning, setIsScanning] = useState(false);
@@ -305,76 +303,81 @@ export const BluetoothConnectModal: React.FC<BluetoothConnectModalProps> = ({
                 </div>
               )}
 
-              {/* Error Status Display */}
-              {errorStatus && (
-                <div className="p-3 rounded-xl border border-amber-500/40 bg-amber-500/10 flex items-start gap-2.5 text-xs text-amber-300">
-                  <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-amber-400" />
-                  <div>
-                    <span className="font-bold">Bluetooth Notice: </span>
-                    <span>{errorStatus}</span>
-                  </div>
-                </div>
-              )}
+          {/* Error Status Display */}
+          {errorStatus && (
+            <div
+              className={`p-3 rounded-xl border flex items-start gap-2.5 text-xs ${
+                isLightMode
+                  ? 'border-amber-300 bg-amber-50 text-amber-900'
+                  : 'border-amber-500/40 bg-amber-500/10 text-amber-300'
+              }`}
+            >
+              <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-amber-500" />
+              <div>
+                <span className="font-bold">Bluetooth Notice: </span>
+                <span>{errorStatus}</span>
+              </div>
+            </div>
+          )}
             </div>
           )}
 
-          {/* Quick Hardware Checklist */}
+        {/* Quick Hardware Checklist */}
+        <div
+          className={`p-3.5 rounded-xl border text-xs space-y-2 ${
+            isLightMode ? 'bg-slate-50 border-slate-200' : 'bg-slate-800/40 border-slate-700/60'
+          }`}
+        >
           <div
-            className={`p-3.5 rounded-xl border text-xs space-y-2 ${
-              isLightMode ? 'bg-slate-50 border-slate-200' : 'bg-slate-800/40 border-slate-700/60'
+            className={`font-semibold flex items-center gap-1.5 font-mono ${
+              isLightMode ? 'text-cyan-700' : 'text-cyan-400'
             }`}
           >
-            <div className="font-semibold flex items-center gap-1.5 text-cyan-400 font-mono">
-              <Cpu className="w-3.5 h-3.5" />
-              <span>HC-05 Quick Wiring Checklist</span>
-            </div>
-            <ul className="space-y-1 text-slate-400 list-disc list-inside text-[11px] leading-relaxed">
-              <li>
-                <strong>VCC:</strong> 5V from Arduino Uno &middot; <strong>GND:</strong> GND
-              </li>
-              <li>
-                <strong>TXD of HC-05:</strong> Connect to <strong>Pin 10</strong> (RX) of Uno
-              </li>
-              <li>
-                <strong>RXD of HC-05:</strong> Connect to <strong>Pin 11</strong> (TX) via 1k/2k
-                divider
-              </li>
-              <li>
-                <strong>Baud Rate:</strong> 9600 baud &middot; <strong>Pairing PIN:</strong> 1234 or
-                0000
-              </li>
-            </ul>
+            <Cpu className="w-3.5 h-3.5" />
+            <span>HC-05 Quick Wiring Checklist</span>
           </div>
+          <ul
+            className={`space-y-1 list-disc list-inside text-[11px] leading-relaxed ${
+              isLightMode ? 'text-slate-600' : 'text-slate-400'
+            }`}
+          >
+            <li>
+              <strong>VCC:</strong> 5V from Arduino Uno &middot; <strong>GND:</strong> GND
+            </li>
+            <li>
+              <strong>TXD of HC-05:</strong> Connect to <strong>Pin 10</strong> (RX) of Uno
+            </li>
+            <li>
+              <strong>RXD of HC-05:</strong> Connect to <strong>Pin 11</strong> (TX) via 1k/2k
+              divider
+            </li>
+            <li>
+              <strong>Baud Rate:</strong> 9600 baud &middot; <strong>Pairing PIN:</strong> 1234 or
+              0000
+            </li>
+          </ul>
+        </div>
 
-          {/* Alternatives & Test Injection */}
-          <div className="pt-2 border-t border-slate-700/60 flex flex-wrap items-center justify-between gap-2">
-            {/* USB Alternative */}
-            <button
-              onClick={() => {
-                onClose();
-                onConnectUSB();
-              }}
-              className="text-xs font-mono text-cyan-400 hover:underline flex items-center gap-1"
-            >
-              <Usb className="w-3.5 h-3.5" />
-              <span>Or connect via USB Cable (OTG)</span>
-            </button>
-
-            {/* Test Simulation Feed */}
-            {onInjectTestStream && (
-              <button
-                onClick={() => {
-                  onInjectTestStream();
-                  onClose();
-                }}
-                className="text-xs font-mono text-emerald-400 hover:underline flex items-center gap-1"
-                title="Send the exact Arduino Uno test text stream to verify dashboard"
-              >
-                <Play className="w-3 h-3" />
-                <span>Simulate Arduino Data Stream</span>
-              </button>
-            )}
-          </div>
+        {/* Alternatives */}
+        <div
+          className={`pt-2 border-t flex items-center justify-between gap-2 ${
+            isLightMode ? 'border-slate-200' : 'border-slate-700/60'
+          }`}
+        >
+          {/* USB Alternative */}
+          <button
+            onClick={() => {
+              onClose();
+              onConnectUSB();
+            }}
+            className={`text-xs font-mono hover:underline flex items-center gap-1 cursor-pointer ${
+              isLightMode ? 'text-cyan-700' : 'text-cyan-400'
+            }`}
+          >
+            <Usb className="w-3.5 h-3.5" />
+            <span>Or connect via USB Cable (OTG)</span>
+          </button>
+        </div>
         </div>
       </div>
     </div>

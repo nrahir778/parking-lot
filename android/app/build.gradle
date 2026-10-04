@@ -5,7 +5,7 @@ def getBuildVersionCode() {
     if (runNum != null && runNum.isInteger()) {
         return 1000 + Integer.parseInt(runNum)
     }
-    return 1001
+    return (int) (System.currentTimeMillis() / 60000)
 }
 
 def getBuildVersionName() {

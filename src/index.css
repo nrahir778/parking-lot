@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @layer utilities {
   .preserve-3d {
     transform-style: preserve-3d;
@@ -12,6 +14,9 @@
   }
   .backface-hidden {
     backface-visibility: hidden;
+  }
+  .font-gujarati {
+    font-family: 'Anek Gujarati', 'Noto Sans Gujarati', 'Shruti', system-ui, sans-serif;
   }
 }
 
@@ -187,5 +192,32 @@
   background-image: radial-gradient(rgba(22, 101, 52, 0.8) 1px, transparent 0),
                     radial-gradient(rgba(34, 197, 94, 0.4) 1px, transparent 0);
   background-size: 6px 6px, 10px 10px;
+}
+
+.grass-divider-texture {
+  background-color: #15803d;
+  background-image: radial-gradient(rgba(20, 83, 45, 0.9) 1px, transparent 0),
+                    radial-gradient(rgba(74, 222, 128, 0.5) 1px, transparent 0);
+  background-size: 4px 4px, 8px 8px;
+}
+
+.white-road-stripes {
+  background: repeating-linear-gradient(
+    90deg,
+    #ffffff,
+    #ffffff 20px,
+    transparent 20px,
+    transparent 40px
+  );
+}
+
+.white-crosswalk-stripes {
+  background: repeating-linear-gradient(
+    90deg,
+    #ffffff,
+    #ffffff 8px,
+    transparent 8px,
+    transparent 16px
+  );
 }
 

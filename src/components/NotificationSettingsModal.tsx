@@ -115,15 +115,19 @@ export const NotificationSettingsModal: React.FC<NotificationSettingsModalProps>
           <div
             className={`p-3.5 rounded-xl border flex items-center justify-between text-xs ${
               permissionStatus
-                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                ? isLightMode
+                  ? 'bg-emerald-50 border-emerald-300 text-emerald-900'
+                  : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                : isLightMode
+                ? 'bg-amber-50 border-amber-300 text-amber-900'
                 : 'bg-amber-500/10 border-amber-500/30 text-amber-300'
             }`}
           >
             <div className="flex items-center gap-2.5">
               {permissionStatus ? (
-                <ShieldCheck className="w-5 h-5 text-emerald-400 shrink-0" />
+                <ShieldCheck className="w-5 h-5 text-emerald-500 shrink-0" />
               ) : (
-                <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0" />
+                <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0" />
               )}
               <div>
                 <div className="font-bold">
@@ -131,7 +135,7 @@ export const NotificationSettingsModal: React.FC<NotificationSettingsModalProps>
                     ? 'Device Notifications Allowed'
                     : 'System Permission Needed'}
                 </div>
-                <div className="text-[11px] text-slate-400">
+                <div className={`text-[11px] ${isLightMode ? 'text-slate-600' : 'text-slate-400'}`}>
                   {permissionStatus
                     ? 'Alerts appear in Android notification bar & lockscreen'
                     : 'Tap allow to receive background parking alerts'}
@@ -157,7 +161,7 @@ export const NotificationSettingsModal: React.FC<NotificationSettingsModalProps>
           >
             <div>
               <div className="text-sm font-bold">Enable Notifications</div>
-              <div className="text-xs text-slate-400">
+              <div className={`text-xs ${isLightMode ? 'text-slate-500' : 'text-slate-400'}`}>
                 Receive important parking and gate alert updates
               </div>
             </div>
@@ -177,7 +181,11 @@ export const NotificationSettingsModal: React.FC<NotificationSettingsModalProps>
 
           {/* Granular Notification Rules */}
           <div className="space-y-2.5 pt-1">
-            <span className="text-[11px] font-mono uppercase tracking-wider text-slate-400 font-semibold px-1">
+            <span
+              className={`text-[11px] font-mono uppercase tracking-wider font-semibold px-1 ${
+                isLightMode ? 'text-slate-500' : 'text-slate-400'
+              }`}
+            >
               Select What You Want to Be Notified About:
             </span>
 
@@ -188,10 +196,10 @@ export const NotificationSettingsModal: React.FC<NotificationSettingsModalProps>
               }`}
             >
               <div className="flex items-center gap-2.5">
-                <AlertTriangle className="w-4 h-4 text-amber-400" />
+                <AlertTriangle className="w-4 h-4 text-amber-500" />
                 <div>
                   <div className="font-semibold">Parking Full Alert</div>
-                  <div className="text-[11px] text-slate-400">
+                  <div className={`text-[11px] ${isLightMode ? 'text-slate-500' : 'text-slate-400'}`}>
                     When all 3 bays become occupied &amp; gate closes
                   </div>
                 </div>
