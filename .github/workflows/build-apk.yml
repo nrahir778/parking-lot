@@ -1,19 +1,28 @@
-name: Build Native Android APK
+name: Build Native Android APK & Release
 
 on:
   push:
     branches: [ "main" ]
+    tags:
+      - 'v*'
   pull_request:
     branches: [ "main" ]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
     - name: Checkout Repository
       uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
 
     - name: Set up Node.js
       uses: actions/setup-node@v4
@@ -76,9 +85,68 @@ jobs:
         chmod +x ./gradlew
         bash ./gradlew assembleDebug
 
+    - name: Prepare Release APK with Latest Version
+      run: |
+        if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+          TAG="${{ github.ref_name }}"
+          VERSION="${TAG#v}"
+        else
+          VERSION="1.0.${{ github.run_number }}"
+          TAG="v${VERSION}"
+        fi
+        
+        APK_PATH=$(find android/app/build/outputs/apk -name "*.apk" -print -quit 2>/dev/null)
+        if [ -z "$APK_PATH" ]; then
+          APK_PATH=$(find . -name "*.apk" -print -quit 2>/dev/null)
+        fi
+        
+        echo "Found APK at: $APK_PATH"
+        TARGET_APK="SmartParking-v${VERSION}.apk"
+        LATEST_APK="SmartParking-latest.apk"
+        
+        cp "$APK_PATH" "$TARGET_APK"
+        cp "$APK_PATH" "$LATEST_APK"
+        
+        echo "RELEASE_TAG=${TAG}" >> $GITHUB_ENV
+        echo "RELEASE_VERSION=${VERSION}" >> $GITHUB_ENV
+        echo "RELEASE_APK=${TARGET_APK}" >> $GITHUB_ENV
+        echo "LATEST_APK=${LATEST_APK}" >> $GITHUB_ENV
+
     - name: Upload APK Artifact
       uses: actions/upload-artifact@v4
       with:
         name: parking-lot-apk
         path: |
+          SmartParking-v*.apk
+          SmartParking-latest.apk
           **/build/outputs/apk/debug/*.apk
+
+    - name: Publish Direct GitHub Release
+      if: github.event_name != 'pull_request'
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: ${{ env.RELEASE_TAG }}
+        name: Smart Parking ${{ env.RELEASE_TAG }}
+        draft: false
+        prerelease: false
+        make_latest: true
+        body: |
+          ## 🚗 Smart Parking System — Release ${{ env.RELEASE_TAG }}
+          
+          ### 📱 Direct APK Download
+          Download the Android APK directly to your phone:
+          - **[${{ env.RELEASE_APK }}](https://github.com/${{ github.repository }}/releases/download/${{ env.RELEASE_TAG }}/${{ env.RELEASE_APK }})** (Version-specific APK)
+          - **[SmartParking-latest.apk](https://github.com/${{ github.repository }}/releases/download/${{ env.RELEASE_TAG }}/${{ env.LATEST_APK }})** (Latest APK)
+          
+          ---
+          
+          #### 📋 Build Details:
+          - **Version:** `${{ env.RELEASE_VERSION }}`
+          - **Version Code:** `1000 + ${{ github.run_number }}`
+          - **Commit:** `${{ github.sha }}`
+          - **Seamless Updates:** Uses consistent signature key — install directly or update existing app in 1 tap without uninstalling!
+        files: |
+          ${{ env.RELEASE_APK }}
+          ${{ env.LATEST_APK }}
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

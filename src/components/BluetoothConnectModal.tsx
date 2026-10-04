@@ -13,9 +13,11 @@ import {
   Cpu,
   Usb,
   ShieldCheck,
+  Download,
 } from 'lucide-react';
 import { hc05Bluetooth, DiscoveredBluetoothDevice } from '../services/webBluetooth';
 import { ConnectionMode } from '../types';
+import { downloadArduinoInoFile } from '../utils/downloadFirmware';
 
 interface BluetoothConnectModalProps {
   isOpen: boolean;
@@ -151,25 +153,55 @@ export const BluetoothConnectModal: React.FC<BluetoothConnectModalProps> = ({
         <div className="p-5 overflow-y-auto space-y-4">
           {/* Active Connection Banner */}
           {isConnected ? (
-            <div className="p-4 rounded-xl border border-emerald-500/40 bg-emerald-500/10 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <CheckCircle2 className="w-6 h-6 text-emerald-400 shrink-0" />
-                <div>
-                  <div className="text-xs font-mono font-bold text-emerald-400">
-                    BLUETOOTH CONNECTED
-                  </div>
-                  <div className="text-sm font-semibold">{portLabel || 'HC-05 Serial Module'}</div>
-                  <div className="text-[11px] text-slate-400 font-mono mt-0.5">
-                    Receiving live Arduino telemetry @ 9600 baud
+            <div className="space-y-3">
+              <div className="p-4 rounded-xl border border-emerald-500/40 bg-emerald-500/10 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <CheckCircle2 className="w-6 h-6 text-emerald-400 shrink-0" />
+                  <div>
+                    <div className="text-xs font-mono font-bold text-emerald-400">
+                      BLUETOOTH CONNECTED
+                    </div>
+                    <div className="text-sm font-semibold">{portLabel || 'HC-05 Serial Module'}</div>
+                    <div className="text-[11px] text-slate-400 font-mono mt-0.5">
+                      Receiving live Arduino telemetry
+                    </div>
                   </div>
                 </div>
+                <button
+                  onClick={onDisconnect}
+                  className="px-3 py-1.5 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/40 text-xs font-mono font-semibold transition-all cursor-pointer"
+                >
+                  Disconnect
+                </button>
               </div>
-              <button
-                onClick={onDisconnect}
-                className="px-3 py-1.5 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/40 text-xs font-mono font-semibold transition-all"
+
+              {/* Download Firmware Card */}
+              <div
+                className={`p-3.5 rounded-xl border flex items-center justify-between gap-3 ${
+                  isLightMode
+                    ? 'bg-cyan-50/80 border-cyan-200'
+                    : 'bg-cyan-950/20 border-cyan-500/30'
+                }`}
               >
-                Disconnect
-              </button>
+                <div className="flex items-center gap-2.5">
+                  <Download className="w-5 h-5 text-cyan-500 shrink-0" />
+                  <div>
+                    <div className="text-xs font-bold text-cyan-600 dark:text-cyan-300">
+                      Installed Arduino Firmware (.ino)
+                    </div>
+                    <div className={`text-[10px] ${isLightMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                      Download the C++ source code installed in this Arduino
+                    </div>
+                  </div>
+                </div>
+                <button
+                  onClick={() => downloadArduinoInoFile()}
+                  className="px-3 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-mono font-bold flex items-center gap-1.5 shadow-xs cursor-pointer active:scale-95 shrink-0"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Download .ino</span>
+                </button>
+              </div>
             </div>
           ) : (
             <div className="space-y-3">

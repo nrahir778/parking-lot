@@ -18,8 +18,10 @@ import { SerialConsole } from './components/SerialConsole';
 import { ArduinoGuideModal } from './components/ArduinoGuideModal';
 import { BluetoothConnectModal } from './components/BluetoothConnectModal';
 import { NotificationSettingsModal } from './components/NotificationSettingsModal';
+import { PermissionPromptModal } from './components/PermissionPromptModal';
 import { InAppToastContainer } from './components/InAppToastContainer';
 import { notificationService } from './services/notificationService';
+import { downloadArduinoInoFile } from './utils/downloadFirmware';
 import {
   serialManager,
   SerialLineParser,
@@ -98,8 +100,22 @@ export default function App() {
   const [isArduinoGuideOpen, setIsArduinoGuideOpen] = useState(false);
   const [isBluetoothModalOpen, setIsBluetoothModalOpen] = useState(false);
   const [isNotificationModalOpen, setIsNotificationModalOpen] = useState(false);
+  const [isPermissionPromptOpen, setIsPermissionPromptOpen] = useState(false);
   const [portLabel, setPortLabel] = useState<string | undefined>(undefined);
   const [isParkingLotFullscreen, setIsParkingLotFullscreen] = useState(false);
+
+  // Check on first app launch if permissions were granted
+  useEffect(() => {
+    try {
+      const alreadyGranted = localStorage.getItem('smartparking_permissions_granted');
+      if (!alreadyGranted) {
+        const timer = setTimeout(() => {
+          setIsPermissionPromptOpen(true);
+        }, 500);
+        return () => clearTimeout(timer);
+      }
+    } catch {}
+  }, []);
 
   // Manage body overflow when in fullscreen mode
   useEffect(() => {
@@ -492,6 +508,7 @@ export default function App() {
           portLabel={portLabel}
           isLightMode={isLight}
           lastDataReceivedAt={lastDataReceivedAt}
+          onConnectBluetooth={() => setIsBluetoothModalOpen(true)}
         />
 
         {/* 3D Isometric Parking Yard (Realistic, Simple Normal Cars, Light & Dark Theme) */}
@@ -542,16 +559,30 @@ export default function App() {
         }`}
       >
         <div className="flex flex-wrap items-center justify-center gap-2">
-          <span>Smart Parking System · શ્રી સરકારી માધ્યમિક શાળા લાખાપર</span>
+          <span>Smart Parking · શ્રી સરકારી માધ્યમિક શાળા લાખાપર</span>
+          <span className="opacity-30">·</span>
+          <button
+            onClick={() => downloadArduinoInoFile()}
+            className="text-cyan-600 dark:text-cyan-400 hover:underline cursor-pointer font-bold"
+          >
+            📥 Download Arduino Firmware (.ino)
+          </button>
           <span className="opacity-30">·</span>
           <button
             onClick={() => setIsArduinoGuideOpen(true)}
-            className="text-cyan-600 dark:text-cyan-400 hover:underline cursor-pointer"
+            className="text-slate-500 hover:text-slate-400 hover:underline cursor-pointer"
           >
-            Hardware &amp; Wiring Diagram
+            Wiring Diagram
           </button>
         </div>
       </footer>
+
+      {/* First Launch Permissions Onboarding Modal */}
+      <PermissionPromptModal
+        isOpen={isPermissionPromptOpen}
+        onClose={() => setIsPermissionPromptOpen(false)}
+        isLightMode={isLight}
+      />
 
       {/* Arduino Firmware & Wiring Guide Modal */}
       <ArduinoGuideModal
