@@ -240,6 +240,19 @@ class SmartNotificationService {
     );
   }
 
+  public notifyPaymentDeducted(slotId: number, plate: string, amount: number, durationSeconds: number) {
+    const mins = Math.floor(durationSeconds / 60);
+    const secs = durationSeconds % 60;
+    const timeStr = mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
+    this.sendNotification(
+      `payment_deducted_${slotId}_${Date.now()}`,
+      `💰 Auto-Deducted: ₹${amount.toFixed(2)}`,
+      `${plate} departed LOT ${slotId} (${timeStr} parked). Payment successful & collection updated.`,
+      'success',
+      2000
+    );
+  }
+
   public notifyHardwareConnected(name: string) {
     this.sendNotification(
       'alert_hardware_connect',

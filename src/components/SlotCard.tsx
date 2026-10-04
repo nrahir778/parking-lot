@@ -1,13 +1,27 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { SlotData } from '../types';
-import { ShieldCheck, ShieldAlert, HelpCircle, Clock, Navigation } from 'lucide-react';
+import {
+  ShieldCheck,
+  ShieldAlert,
+  HelpCircle,
+  Clock,
+  Navigation,
+  IndianRupee,
+  Receipt,
+  Car,
+} from 'lucide-react';
 
 interface SlotCardProps {
   slot: SlotData;
   isLightMode?: boolean;
+  onToggleSlotStatus?: (slotId: 1 | 2 | 3) => void;
 }
 
-export const SlotCard: React.FC<SlotCardProps> = ({ slot, isLightMode = false }) => {
+export const SlotCard: React.FC<SlotCardProps> = ({
+  slot,
+  isLightMode = false,
+  onToggleSlotStatus,
+}) => {
   const isOccupied = slot.status === 'OCCUPIED';
   const isEmpty = slot.status === 'EMPTY' || slot.status === 'AVAILABLE';
 
@@ -19,6 +33,15 @@ export const SlotCard: React.FC<SlotCardProps> = ({ slot, isLightMode = false })
   const unit = slot.unit || 'cm';
   // Progress bar calculation (0 - 50 cm range)
   const distPercent = Math.min(100, Math.max(0, (slot.distance / 50) * 100));
+
+  // Parked duration text
+  const durationText = useMemo(() => {
+    if (!isOccupied || !slot.parkedSince) return '00:00';
+    const elapsedSeconds = Math.max(0, Math.floor((Date.now() - slot.parkedSince) / 1000));
+    const mins = Math.floor(elapsedSeconds / 60);
+    const secs = elapsedSeconds % 60;
+    return `${mins}m ${secs < 10 ? '0' : ''}${secs}s`;
+  }, [isOccupied, slot.parkedSince, slot.currentCharge]);
 
   return (
     <div
@@ -110,8 +133,74 @@ export const SlotCard: React.FC<SlotCardProps> = ({ slot, isLightMode = false })
           </div>
         </div>
 
+        {/* PRICING & LIVE BILLING BOX */}
+        <div className="mt-3 p-3 rounded-xl border bg-black/5 dark:bg-black/35 border-black/10 dark:border-white/10 space-y-2">
+          {/* Rate Header & Total Lot Collection */}
+          <div className="flex items-center justify-between text-xs font-mono">
+            <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400 font-bold">
+              <IndianRupee className="w-3.5 h-3.5" />
+              <span>₹10 / MIN</span>
+            </span>
+            <span className="text-[11px] font-bold text-slate-600 dark:text-slate-300">
+              Total Collection: <span className="text-amber-500 dark:text-amber-400 font-mono font-black tabular-nums">₹{slot.totalCollection || 0}</span>
+            </span>
+          </div>
+
+          {/* Active Bill Display */}
+          <div className="p-2.5 rounded-lg bg-white/70 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 flex items-center justify-between">
+            <div>
+              <p className="text-[10px] font-mono uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                {isOccupied ? 'Live Charge (Updates every 3s)' : 'Current Charge'}
+              </p>
+              <div className="flex items-baseline gap-1 mt-0.5">
+                <span className={`text-2xl font-mono font-black tabular-nums ${
+                  isOccupied ? 'text-emerald-600 dark:text-emerald-400 animate-pulse' : 'text-slate-400'
+                }`}>
+                  ₹{(slot.currentCharge || 0).toFixed(2)}
+                </span>
+                {isOccupied && (
+                  <span className="text-[10px] font-mono text-slate-500 dark:text-slate-400">
+                    · {durationText}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Quick Car Info or Ready Status */}
+            <div className="text-right">
+              {isOccupied ? (
+                <div className="flex flex-col items-end">
+                  <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                    {slot.car.plate}
+                  </span>
+                  <span className="text-[9px] text-slate-500 dark:text-slate-400 truncate max-w-[100px]">
+                    {slot.car.modelName}
+                  </span>
+                </div>
+              ) : (
+                <span className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 font-bold bg-emerald-500/10 px-2 py-1 rounded">
+                  ₹0.00 for next car
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Last Automatic Cut Deduction Information */}
+          {slot.lastDeduction && (
+            <div className="flex items-center justify-between text-[10px] font-mono text-slate-500 dark:text-slate-400 pt-1 border-t border-slate-200/50 dark:border-slate-800/50">
+              <span className="flex items-center gap-1">
+                <Receipt className="w-3 h-3 text-cyan-500" />
+                <span>Last auto-deducted:</span>
+              </span>
+              <span className="font-bold text-slate-700 dark:text-slate-300">
+                ₹{slot.lastDeduction.amountPaid.toFixed(2)} ({Math.max(1, Math.round(slot.lastDeduction.durationSeconds / 60))}m)
+              </span>
+            </div>
+          )}
+        </div>
+
         {/* Distance Proximity Display */}
-        <div className="mt-3.5 p-3 sm:p-3.5 rounded-xl border bg-black/5 dark:bg-black/30 border-black/5 dark:border-white/5 space-y-2">
+        <div className="mt-3 p-3 rounded-xl border bg-black/5 dark:bg-black/30 border-black/5 dark:border-white/5 space-y-2">
           <div className="flex items-center justify-between text-[11px]">
             <span
               className={`font-semibold tracking-wide uppercase flex items-center gap-1.5 ${
@@ -131,17 +220,31 @@ export const SlotCard: React.FC<SlotCardProps> = ({ slot, isLightMode = false })
           </div>
 
           {/* Large Proximity Value */}
-          <div className="flex items-baseline gap-1.5">
-            <span className="text-3xl sm:text-4xl font-mono font-black tabular-nums tracking-tight">
-              {slot.hasHardwareReading ? slot.distance.toFixed(1) : '--.-'}
-            </span>
-            <span className="text-sm sm:text-base font-mono font-bold opacity-75">
-              {unit}
-            </span>
+          <div className="flex items-baseline justify-between">
+            <div className="flex items-baseline gap-1.5">
+              <span className="text-2xl sm:text-3xl font-mono font-black tabular-nums tracking-tight">
+                {slot.hasHardwareReading ? slot.distance.toFixed(1) : '--.-'}
+              </span>
+              <span className="text-sm font-mono font-bold opacity-75">
+                {unit}
+              </span>
+            </div>
+
+            {/* Test Simulation Button if interactive */}
+            {onToggleSlotStatus && (
+              <button
+                onClick={() => onToggleSlotStatus(slot.id)}
+                className="px-2.5 py-1 text-[10px] font-mono font-bold rounded-lg border border-slate-300 dark:border-slate-700 hover:border-cyan-500 text-slate-600 dark:text-slate-300 hover:text-cyan-500 transition-colors cursor-pointer flex items-center gap-1"
+                title="Simulate vehicle arrival or departure"
+              >
+                <Car className="w-3 h-3" />
+                <span>{isOccupied ? 'Exit Car' : 'Park Car'}</span>
+              </button>
+            )}
           </div>
 
           {/* Smooth Distance Gauge */}
-          <div className="w-full bg-slate-300/80 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
+          <div className="w-full bg-slate-300/80 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden">
             <div
               className={`h-full transition-all duration-500 rounded-full ${
                 isOccupied ? 'bg-rose-500' : isEmpty ? 'bg-emerald-500' : 'bg-slate-500'
@@ -154,7 +257,7 @@ export const SlotCard: React.FC<SlotCardProps> = ({ slot, isLightMode = false })
 
       {/* Footer: Live Timestamp */}
       <div
-        className={`mt-3.5 pt-2.5 border-t flex items-center justify-between text-[11px] font-mono ${
+        className={`mt-3 pt-2 border-t flex items-center justify-between text-[11px] font-mono ${
           isLightMode ? 'border-slate-200 text-slate-500' : 'border-slate-800 text-slate-400'
         }`}
       >

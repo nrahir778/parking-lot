@@ -9,6 +9,20 @@ export interface CarVisualConfig {
   accentColor: string;
   modelName: string;
   plate: string;
+  type?: 'sedan' | 'suv' | 'hatchback';
+}
+
+export interface ParkingReceipt {
+  id: string;
+  slotId: SlotId;
+  slotName: string;
+  plate: string;
+  modelName: string;
+  entryTime: number;
+  exitTime: number;
+  durationSeconds: number;
+  amountPaid: number;
+  timestamp: number;
 }
 
 export interface SlotData {
@@ -22,6 +36,12 @@ export interface SlotData {
   lastUpdated: number; // timestamp of last reading
   car: CarVisualConfig;
   hasHardwareReading: boolean;
+  
+  // Pricing & Collection Features
+  parkedSince?: number | null; // Timestamp ms when vehicle arrived
+  currentCharge: number; // Live accumulated fee in Rupees (updating every 3s)
+  totalCollection: number; // Cumulative revenue in Rupees collected by this specific lot
+  lastDeduction?: ParkingReceipt | null; // Most recent settled payment receipt
 }
 
 export interface ArduinoSummaryData {
@@ -66,3 +86,6 @@ export interface ArduinoPortDetails {
   portLabel?: string;
   connectionType?: 'usb' | 'bluetooth';
 }
+
+export const PARKING_RATE_PER_MINUTE = 10; // ₹10 per minute
+export const CHARGE_UPDATE_INTERVAL_MS = 3000; // Updated every 3 seconds
