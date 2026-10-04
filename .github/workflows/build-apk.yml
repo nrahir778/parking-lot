@@ -5,6 +5,7 @@ on:
     branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
+  workflow_dispatch:
 
 jobs:
   build:
@@ -17,7 +18,7 @@ jobs:
     - name: Set up Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '22' # 👈 Bypasses the strict caching check causing your current error
+        node-version: '22'
 
     - name: Install Node Dependencies
       run: npm install --legacy-peer-deps
@@ -28,11 +29,9 @@ jobs:
     - name: Sync Capacitor Android Project
       run: npx cap sync android || true
 
-    - name: Install Asset Tools
-      run: npm install @capacitor/assets --save-dev --legacy-peer-deps
-
-    - name: Generate Icon Assets
-      run: npx @capacitor/assets generate --android
+    - name: Generate Custom Icons
+      run: |
+        npm run icons:generate || true
 
     - name: Set up Java JDK 21
       uses: actions/setup-java@v4
@@ -49,6 +48,17 @@ jobs:
         elif [ -f "gradle.properties" ]; then
           echo "android.useAndroidX=true" >> gradle.properties
           echo "android.enableJetifier=true" >> gradle.properties
+        fi
+
+    - name: Ensure Persistent Keystore Exists
+      run: |
+        if [ ! -f "android/app/debug.keystore" ]; then
+          echo "debug.keystore not found, creating persistent keystore..."
+          openssl req -x509 -newkey rsa:2048 -keyout /tmp/key.pem -out /tmp/cert.pem -days 10000 -nodes -subj "/CN=Android Debug/O=Android/C=US"
+          openssl pkcs12 -export -in /tmp/cert.pem -inkey /tmp/key.pem -out android/app/debug.keystore -name androiddebugkey -password pass:android
+          rm -f /tmp/key.pem /tmp/cert.pem
+        else
+          echo "Persistent debug.keystore found in android/app/debug.keystore (Consistent signing signature enabled)."
         fi
 
     - name: Grant Execute Permission for Gradle Wrapper

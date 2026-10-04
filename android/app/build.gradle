@@ -1,14 +1,48 @@
 apply plugin: 'com.android.application'
 
+def getBuildVersionCode() {
+    def runNum = System.getenv("GITHUB_RUN_NUMBER")
+    if (runNum != null && runNum.isInteger()) {
+        return 1000 + Integer.parseInt(runNum)
+    }
+    return 1001
+}
+
+def getBuildVersionName() {
+    def runNum = System.getenv("GITHUB_RUN_NUMBER")
+    if (runNum != null) {
+        return "1.0." + runNum
+    }
+    return "1.0.1"
+}
+
 android {
     namespace = "com.lakhapar.smartparking"
     compileSdk = rootProject.ext.compileSdkVersion
+
+    // Persistent signing config ensures every build uses the exact same signature certificate.
+    // This allows updating the APK directly on Android without uninstalling the previous version.
+    signingConfigs {
+        debug {
+            storeFile file('debug.keystore')
+            storePassword 'android'
+            keyAlias 'androiddebugkey'
+            keyPassword 'android'
+        }
+        release {
+            storeFile file('debug.keystore')
+            storePassword 'android'
+            keyAlias 'androiddebugkey'
+            keyPassword 'android'
+        }
+    }
+
     defaultConfig {
         applicationId "com.lakhapar.smartparking"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        versionCode getBuildVersionCode()
+        versionName getBuildVersionName()
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -17,7 +51,11 @@ android {
         }
     }
     buildTypes {
+        debug {
+            signingConfig signingConfigs.debug
+        }
         release {
+            signingConfig signingConfigs.release
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }

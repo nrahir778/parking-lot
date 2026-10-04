@@ -16,8 +16,6 @@ import { BuzzerIndicator } from './components/BuzzerIndicator';
 import { SlotCard } from './components/SlotCard';
 import { SerialConsole } from './components/SerialConsole';
 import { ArduinoGuideModal } from './components/ArduinoGuideModal';
-import { ApkBuildModal } from './components/ApkBuildModal';
-import { OfflineIndicator } from './components/OfflineIndicator';
 import { BluetoothConnectModal } from './components/BluetoothConnectModal';
 import { NotificationSettingsModal } from './components/NotificationSettingsModal';
 import { InAppToastContainer } from './components/InAppToastContainer';
@@ -29,8 +27,6 @@ import {
 } from './services/webSerial';
 import { hc05Bluetooth, HC05BluetoothManager } from './services/webBluetooth';
 import { buzzerAudio } from './services/audioBuzzer';
-import { exportStandaloneHtmlFile } from './utils/exportSingleFileHtml';
-import { Info, Bluetooth, Usb } from 'lucide-react';
 
 const INITIAL_SLOTS: SlotData[] = [
   {
@@ -100,7 +96,6 @@ export default function App() {
   const [logs, setLogs] = useState<SerialLogEntry[]>([]);
   const [selectedSlotId, setSelectedSlotId] = useState<number | undefined>(undefined);
   const [isArduinoGuideOpen, setIsArduinoGuideOpen] = useState(false);
-  const [isApkModalOpen, setIsApkModalOpen] = useState(false);
   const [isBluetoothModalOpen, setIsBluetoothModalOpen] = useState(false);
   const [isNotificationModalOpen, setIsNotificationModalOpen] = useState(false);
   const [portLabel, setPortLabel] = useState<string | undefined>(undefined);
@@ -468,7 +463,7 @@ export default function App() {
           : 'bg-[#080c14] text-slate-100 selection:bg-cyan-500/20'
       }`}
     >
-      {/* Top Header Bar */}
+      {/* Clean Top Header Bar */}
       <HeaderBar
         connectionMode={connectionMode}
         theme={theme}
@@ -476,11 +471,7 @@ export default function App() {
         onConnectUSB={handleConnectUSB}
         onConnectBluetooth={() => setIsBluetoothModalOpen(true)}
         onDisconnect={handleDisconnect}
-        onExportSingleFileHtml={exportStandaloneHtmlFile}
-        onOpenArduinoGuide={() => setIsArduinoGuideOpen(true)}
-        onOpenApkModal={() => setIsApkModalOpen(true)}
         onOpenNotificationModal={() => setIsNotificationModalOpen(true)}
-        isBrowserSupported={isBrowserSupported}
         portLabel={portLabel}
         isFullscreen={isParkingLotFullscreen}
         onToggleFullscreen={() => setIsParkingLotFullscreen((prev) => !prev)}
@@ -489,43 +480,8 @@ export default function App() {
       {/* In-App Live Notification Toast HUD */}
       <InAppToastContainer isLightMode={isLight} />
 
-      {/* Connection Guidance Banner */}
-      {connectionMode === 'disconnected' && (
-        <div
-          className={`w-full border-b px-4 md:px-8 py-2.5 transition-colors ${
-            isLight ? 'bg-white border-slate-200' : 'bg-slate-900/90 border-slate-800'
-          }`}
-        >
-          <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3 text-xs">
-            <div className="flex items-center gap-2">
-              <Info className="w-4 h-4 text-cyan-600 dark:text-cyan-400 shrink-0" />
-              <span>
-                <strong>Hardware Ready:</strong> Connect your Arduino Uno using{' '}
-                <strong className="text-cyan-600 dark:text-cyan-400">USB Cable</strong> or wirelessly via{' '}
-                <strong className="text-blue-600 dark:text-blue-400">HC-05 Bluetooth</strong> (9600 baud).
-              </span>
-            </div>
-            <div className="flex items-center gap-3">
-              <button
-                onClick={handleConnectUSB}
-                className="font-mono text-[11px] font-semibold text-cyan-600 dark:text-cyan-400 hover:underline flex items-center gap-1"
-              >
-                <Usb className="w-3 h-3" /> Connect USB
-              </button>
-              <span className="opacity-30">|</span>
-              <button
-                onClick={() => setIsBluetoothModalOpen(true)}
-                className="font-mono text-[11px] font-semibold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
-              >
-                <Bluetooth className="w-3 h-3" /> Connect HC-05
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Main Container */}
-      <main className="flex-1 w-full max-w-7xl mx-auto px-4 md:px-8 py-6 space-y-6">
+      <main className="flex-1 w-full max-w-7xl mx-auto px-3 sm:px-6 md:px-8 py-4 sm:py-6 space-y-5 sm:space-y-6">
         {/* Top Summary Bar */}
         <TopSummary
           slots={slots}
@@ -579,28 +535,28 @@ export default function App() {
         />
       </main>
 
-      {/* Clean Footer */}
+      {/* Clean, Minimal Footer */}
       <footer
-        className={`w-full border-t py-4 px-6 text-center text-xs font-mono transition-colors ${
+        className={`w-full border-t py-3.5 px-4 text-center text-xs font-mono transition-colors ${
           isLight ? 'border-slate-200 text-slate-500 bg-white' : 'border-slate-800/80 text-slate-500 bg-[#080c14]'
         }`}
       >
-        <span>
-          Smart Parking System · HC-SR04 (D2-D7) · FSR (A0-A2) · Buzzer (D8) · MG995 (D11) · HC-05 Bluetooth / USB 9600
-        </span>
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          <span>Smart Parking System · શ્રી સરકારી માધ્યમિક શાળા લાખાપર</span>
+          <span className="opacity-30">·</span>
+          <button
+            onClick={() => setIsArduinoGuideOpen(true)}
+            className="text-cyan-600 dark:text-cyan-400 hover:underline cursor-pointer"
+          >
+            Hardware &amp; Wiring Diagram
+          </button>
+        </div>
       </footer>
 
       {/* Arduino Firmware & Wiring Guide Modal */}
       <ArduinoGuideModal
         isOpen={isArduinoGuideOpen}
         onClose={() => setIsArduinoGuideOpen(false)}
-        isLightMode={isLight}
-      />
-
-      {/* Offline PWA & Native Android APK GitHub Actions Build Modal */}
-      <ApkBuildModal
-        isOpen={isApkModalOpen}
-        onClose={() => setIsApkModalOpen(false)}
         isLightMode={isLight}
       />
 
@@ -623,9 +579,6 @@ export default function App() {
         onClose={() => setIsNotificationModalOpen(false)}
         isLightMode={isLight}
       />
-
-      {/* Floating Offline Readiness & Connectivity Indicator */}
-      <OfflineIndicator />
     </div>
   );
 }
