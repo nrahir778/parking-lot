@@ -215,7 +215,7 @@ export class HC05BluetoothManager {
     // B. Standard Web Bluetooth API (Chrome / Edge)
     if (!('bluetooth' in navigator)) {
       throw new Error(
-        'Web Bluetooth is not supported in this browser. Please use Google Chrome or install the Native Android APK.'
+        'Web Bluetooth is not supported in this browser. Please use Google Chrome on Android or connect via USB OTG cable.'
       );
     }
 
@@ -226,16 +226,44 @@ export class HC05BluetoothManager {
         };
       };
 
-      this.webDevice = await nav.bluetooth.requestDevice({
-        acceptAllDevices: true,
-        optionalServices: [
-          '0000ffe0-0000-1000-8000-00805f9b34fb',
-          '6e400001-b5a3-f393-e0a9-e50e24dcca9e',
-          '00001101-0000-1000-8000-00805f9b34fb',
-          0xffe0,
-          0xffe1,
-        ],
-      });
+      // Attempt 1: Universal scan with all known serial UUIDs
+      try {
+        this.webDevice = await nav.bluetooth.requestDevice({
+          acceptAllDevices: true,
+          optionalServices: [
+            '0000ffe0-0000-1000-8000-00805f9b34fb',
+            '6e400001-b5a3-f393-e0a9-e50e24dcca9e',
+            '00001101-0000-1000-8000-00805f9b34fb',
+            0xffe0,
+            0xffe1,
+          ],
+        });
+      } catch (firstErr: any) {
+        // If user cancelled, rethrow
+        if (firstErr?.name === 'NotFoundError') {
+          throw new Error(
+            'HC-05 not showing up in the scan list? HC-05 uses Bluetooth Classic (SPP), while Chrome only discovers BLE (Bluetooth Low Energy like HM-10/AT-09). Also make sure Location (GPS) is turned ON in your Android settings. Alternatively, connect directly via USB OTG cable.'
+          );
+        }
+        // Attempt 2: Try with namePrefix filter if acceptAllDevices failed
+        this.webDevice = await nav.bluetooth.requestDevice({
+          filters: [
+            { namePrefix: 'HC' },
+            { namePrefix: 'HC-05' },
+            { namePrefix: 'HC-06' },
+            { namePrefix: 'HM' },
+            { namePrefix: 'BT' },
+            { namePrefix: 'Arduino' },
+          ],
+          optionalServices: [
+            '0000ffe0-0000-1000-8000-00805f9b34fb',
+            '6e400001-b5a3-f393-e0a9-e50e24dcca9e',
+            '00001101-0000-1000-8000-00805f9b34fb',
+            0xffe0,
+            0xffe1,
+          ],
+        });
+      }
 
       this.connectedDeviceName = this.webDevice.name || 'HC-05 Bluetooth';
 
