@@ -29,9 +29,34 @@ export default defineConfig(() => {
           theme_color: '#0f172a',
           background_color: '#080c14',
           display: 'standalone',
-          orientation: 'portrait-primary',
+          display_override: ['window-controls-overlay', 'standalone', 'minimal-ui'],
+          orientation: 'any',
           start_url: '/',
           scope: '/',
+          categories: ['education', 'utilities', 'productivity'],
+          shortcuts: [
+            {
+              name: 'Connect USB (Chromebook)',
+              short_name: 'USB Serial',
+              description: 'Plug in Arduino Uno directly via Chromebook USB port',
+              url: '/?action=connect_usb',
+              icons: [{ src: '/pwa-192x192.png', sizes: '192x192' }],
+            },
+            {
+              name: 'Connect Bluetooth (HC-05)',
+              short_name: 'Bluetooth',
+              description: 'Connect to Arduino HC-05 module wirelessly',
+              url: '/?action=connect_bt',
+              icons: [{ src: '/pwa-192x192.png', sizes: '192x192' }],
+            },
+            {
+              name: '3D Parking Yard',
+              short_name: '3D View',
+              description: 'View full 3D interactive parking lot',
+              url: '/?action=fullscreen',
+              icons: [{ src: '/pwa-192x192.png', sizes: '192x192' }],
+            },
+          ],
           icons: [
             {
               src: '/pwa-192x192.png',

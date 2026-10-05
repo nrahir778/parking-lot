@@ -12,6 +12,7 @@ import {
   CheckCircle2,
   IndianRupee,
   Receipt,
+  Laptop,
 } from 'lucide-react';
 import { downloadArduinoInoFile } from '../utils/downloadFirmware';
 
@@ -26,6 +27,8 @@ interface TopSummaryProps {
   lastDataReceivedAt?: number | null;
   onConnectBluetooth?: () => void;
   onOpenReceipts?: () => void;
+  onOpenChromeOSGuide?: () => void;
+  isChromeOS?: boolean;
 }
 
 export const TopSummary: React.FC<TopSummaryProps> = ({
@@ -38,6 +41,8 @@ export const TopSummary: React.FC<TopSummaryProps> = ({
   lastDataReceivedAt,
   onConnectBluetooth,
   onOpenReceipts,
+  onOpenChromeOSGuide,
+  isChromeOS = false,
 }) => {
   const [now, setNow] = useState(Date.now());
   const [hasDownloaded, setHasDownloaded] = useState(false);
@@ -131,6 +136,21 @@ export const TopSummary: React.FC<TopSummaryProps> = ({
 
         {/* Dynamic Actions */}
         <div className="flex items-center gap-1.5 shrink-0">
+          {onOpenChromeOSGuide && (
+            <button
+              onClick={onOpenChromeOSGuide}
+              className={`px-2.5 py-1 rounded-xl border text-[11px] sm:text-xs font-mono font-bold flex items-center gap-1 transition-all shadow-xs active:scale-95 cursor-pointer min-h-[32px] ${
+                isChromeOS
+                  ? 'bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-600 dark:text-emerald-300 border-emerald-500/40'
+                  : 'bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-600 dark:text-cyan-300 border-cyan-500/30'
+              }`}
+              title="ChromeOS Shortcuts & Direct USB Guide"
+            >
+              <Laptop className="w-3 h-3 text-cyan-500" />
+              <span className="hidden xs:inline">ChromeOS</span>
+            </button>
+          )}
+
           {onOpenReceipts && (
             <button
               onClick={onOpenReceipts}

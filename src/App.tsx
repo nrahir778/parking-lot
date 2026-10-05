@@ -23,6 +23,7 @@ import { BluetoothConnectModal } from './components/BluetoothConnectModal';
 import { NotificationSettingsModal } from './components/NotificationSettingsModal';
 import { PermissionPromptModal } from './components/PermissionPromptModal';
 import { ReceiptsModal } from './components/ReceiptsModal';
+import { ChromeOSGuideModal } from './components/ChromeOSGuideModal';
 import { InAppToastContainer } from './components/InAppToastContainer';
 import { notificationService } from './services/notificationService';
 import { downloadArduinoInoFile } from './utils/downloadFirmware';
@@ -122,8 +123,61 @@ export default function App() {
   const [isPermissionPromptOpen, setIsPermissionPromptOpen] = useState(false);
   const [portLabel, setPortLabel] = useState<string | undefined>(undefined);
   const [isParkingLotFullscreen, setIsParkingLotFullscreen] = useState(false);
+  const [isChromeOSModalOpen, setIsChromeOSModalOpen] = useState(false);
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [isPWAInstalled, setIsPWAInstalled] = useState(false);
+
+  // Detect ChromeOS user agent
+  const isChromeOS = typeof navigator !== 'undefined' && /CrOS|Chromebook/i.test(navigator.userAgent);
 
   const isConnected = connectionMode === 'connected_usb' || connectionMode === 'connected_bt';
+
+  // Listen for PWA Install Prompt (ChromeOS Shelf / Launcher)
+  useEffect(() => {
+    const handleBeforeInstall = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+    const handleAppInstalled = () => {
+      setIsPWAInstalled(true);
+      setDeferredPrompt(null);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstall);
+    window.addEventListener('appinstalled', handleAppInstalled);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
+      window.removeEventListener('appinstalled', handleAppInstalled);
+    };
+  }, []);
+
+  const handleInstallPWA = async () => {
+    if (!deferredPrompt) return;
+    try {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') {
+        setIsPWAInstalled(true);
+      }
+      setDeferredPrompt(null);
+    } catch {}
+  };
+
+  // Handle ChromeOS Shelf Shortcuts
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const action = params.get('action');
+      if (action === 'connect_usb') {
+        setTimeout(() => handleConnectUSB(), 600);
+      } else if (action === 'connect_bt') {
+        setTimeout(() => setIsBluetoothModalOpen(true), 600);
+      } else if (action === 'fullscreen') {
+        setTimeout(() => setIsParkingLotFullscreen(true), 600);
+      }
+    } catch {}
+  }, []);
 
   // Check on first app launch if permissions were granted
   useEffect(() => {
@@ -600,6 +654,107 @@ export default function App() {
     setBuzzerState((prev) => ({ ...prev, audioEnabled: nextState }));
   };
 
+  // Physical Keyboard Shortcuts for ChromeOS & Laptops
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Do not trigger shortcuts if user is typing in an input or textarea
+      if (
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLTextAreaElement ||
+        (e.target as HTMLElement)?.isContentEditable
+      ) {
+        return;
+      }
+
+      // '?' -> Open ChromeOS Keyboard Shortcuts Guide
+      if (e.key === '?' || (e.shiftKey && e.key === '/')) {
+        e.preventDefault();
+        setIsChromeOSModalOpen((prev) => !prev);
+        return;
+      }
+
+      // 'Escape' -> Close modals or exit fullscreen
+      if (e.key === 'Escape') {
+        if (isParkingLotFullscreen) {
+          setIsParkingLotFullscreen(false);
+        }
+        setIsChromeOSModalOpen(false);
+        setIsBluetoothModalOpen(false);
+        setIsArduinoGuideOpen(false);
+        setIsNotificationModalOpen(false);
+        setIsReceiptsModalOpen(false);
+        setIsPermissionPromptOpen(false);
+        return;
+      }
+
+      // '1', '2', '3' -> Select Parking Bay
+      if (e.key === '1' || e.key === '2' || e.key === '3') {
+        const slotNum = parseInt(e.key, 10);
+        setSelectedSlotId((prev) => (prev === slotNum ? undefined : slotNum));
+        return;
+      }
+
+      // 'Space' -> Trigger Hardware Buzzer Test Pulse
+      if (e.code === 'Space') {
+        e.preventDefault();
+        triggerBuzzer(1);
+        return;
+      }
+
+      // 'G' / 'g' -> Toggle Barrier Gate
+      if (e.key === 'g' || e.key === 'G') {
+        e.preventDefault();
+        setGateState((prev) => {
+          const nextStatus = prev.status === 'OPEN' ? 'CLOSED' : 'OPEN';
+          const nextAngle = nextStatus === 'CLOSED' ? 90 : 0;
+          addLog(`[GATE] Keyboard toggle: Gate is now ${nextStatus}`, 'system');
+          return { angle: nextAngle, status: nextStatus };
+        });
+        return;
+      }
+
+      // 'F' / 'f' -> Toggle Fullscreen 3D View
+      if (e.key === 'f' || e.key === 'F') {
+        e.preventDefault();
+        setIsParkingLotFullscreen((prev) => !prev);
+        return;
+      }
+
+      // 'U' / 'u' -> Trigger USB Connection (Direct Chromebook Web Serial)
+      if (e.key === 'u' || e.key === 'U') {
+        e.preventDefault();
+        if (connectionMode === 'disconnected') {
+          handleConnectUSB();
+        }
+        return;
+      }
+
+      // 'C' / 'c' -> Open Bluetooth Connection Modal
+      if (e.key === 'c' || e.key === 'C') {
+        e.preventDefault();
+        setIsBluetoothModalOpen((prev) => !prev);
+        return;
+      }
+
+      // 'T' / 't' -> Toggle Theme (Light / Dark)
+      if (e.key === 't' || e.key === 'T') {
+        e.preventDefault();
+        toggleTheme();
+        return;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [
+    isParkingLotFullscreen,
+    connectionMode,
+    triggerBuzzer,
+    toggleTheme,
+    handleConnectUSB,
+    addLog,
+  ]);
+
   const isLight = theme === 'light';
 
   return (
@@ -619,6 +774,7 @@ export default function App() {
         onConnectBluetooth={() => setIsBluetoothModalOpen(true)}
         onDisconnect={handleDisconnect}
         onOpenNotificationModal={() => setIsNotificationModalOpen(true)}
+        onOpenChromeOSGuide={() => setIsChromeOSModalOpen(true)}
         portLabel={portLabel}
         isFullscreen={isParkingLotFullscreen}
         onToggleFullscreen={() => setIsParkingLotFullscreen((prev) => !prev)}
@@ -660,6 +816,8 @@ export default function App() {
           lastDataReceivedAt={lastDataReceivedAt}
           onConnectBluetooth={() => setIsBluetoothModalOpen(true)}
           onOpenReceipts={() => setIsReceiptsModalOpen(true)}
+          onOpenChromeOSGuide={() => setIsChromeOSModalOpen(true)}
+          isChromeOS={isChromeOS}
         />
 
         {/* 3D Isometric Parking Yard (Sleek Mobile Controls & Realistic Graphics) */}
@@ -735,6 +893,13 @@ export default function App() {
           >
             Wiring Diagram
           </button>
+          <span className="opacity-30">·</span>
+          <button
+            onClick={() => setIsChromeOSModalOpen(true)}
+            className="text-cyan-600 dark:text-cyan-400 hover:underline cursor-pointer font-bold"
+          >
+            💻 ChromeOS Shortcuts
+          </button>
         </div>
       </footer>
 
@@ -778,6 +943,16 @@ export default function App() {
         isOpen={isNotificationModalOpen}
         onClose={() => setIsNotificationModalOpen(false)}
         isLightMode={isLight}
+      />
+
+      {/* ChromeOS & Chromebook Optimization Guide Modal */}
+      <ChromeOSGuideModal
+        isOpen={isChromeOSModalOpen}
+        onClose={() => setIsChromeOSModalOpen(false)}
+        isLightMode={isLight}
+        onInstallPWA={handleInstallPWA}
+        canInstallPWA={Boolean(deferredPrompt)}
+        isPWAInstalled={isPWAInstalled}
       />
     </div>
   );

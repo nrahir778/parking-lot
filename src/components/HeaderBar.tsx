@@ -9,6 +9,7 @@ import {
   Maximize2,
   Minimize2,
   BellRing,
+  Laptop,
 } from 'lucide-react';
 
 interface HeaderBarProps {
@@ -19,6 +20,7 @@ interface HeaderBarProps {
   onConnectBluetooth: () => void;
   onDisconnect: () => void;
   onOpenNotificationModal?: () => void;
+  onOpenChromeOSGuide?: () => void;
   portLabel?: string;
   isFullscreen?: boolean;
   onToggleFullscreen?: () => void;
@@ -32,6 +34,7 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
   onConnectBluetooth,
   onDisconnect,
   onOpenNotificationModal,
+  onOpenChromeOSGuide,
   portLabel,
   isFullscreen = false,
   onToggleFullscreen,
@@ -120,6 +123,22 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
           >
             <BellRing className="w-4 h-4 text-cyan-500 dark:text-cyan-400" />
             <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-cyan-400 ring-2 ring-slate-900" />
+          </button>
+        )}
+
+        {/* ChromeOS & Keyboard Shortcuts Guide Button */}
+        {onOpenChromeOSGuide && (
+          <button
+            onClick={onOpenChromeOSGuide}
+            className={`hidden xs:flex p-1.5 sm:p-2 rounded-xl border transition-colors items-center justify-center shrink-0 ${
+              isLight
+                ? 'bg-slate-100 hover:bg-slate-200 text-slate-800 border-slate-300'
+                : 'glass-panel text-cyan-400 hover:text-white border-slate-700'
+            }`}
+            title="ChromeOS & Chromebook Guide (Keyboard Shortcuts & USB Web Serial)"
+            aria-label="ChromeOS Guide"
+          >
+            <Laptop className="w-4 h-4 text-cyan-500 dark:text-cyan-400" />
           </button>
         )}
 
