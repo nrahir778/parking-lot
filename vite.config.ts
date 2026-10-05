@@ -112,8 +112,7 @@ export default defineConfig(() => {
           ],
         },
         devOptions: {
-          enabled: true, // Enables service worker in development preview
-          type: 'module',
+          enabled: false, // Avoid iframe SW registration errors during dev preview
         },
       }),
     ],

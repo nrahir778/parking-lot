@@ -83,9 +83,15 @@ class SmartNotificationService {
       } catch {
         return false;
       }
-    } else if (typeof window !== 'undefined' && 'Notification' in window) {
-      this.permissionGranted = Notification.permission === 'granted';
-      return this.permissionGranted;
+    } else if (typeof window !== 'undefined') {
+      try {
+        if ('Notification' in window) {
+          this.permissionGranted = Notification.permission === 'granted';
+          return this.permissionGranted;
+        }
+      } catch {
+        return false;
+      }
     }
     return false;
   }

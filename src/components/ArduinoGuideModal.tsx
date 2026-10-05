@@ -8,48 +8,46 @@ interface ArduinoGuideModalProps {
 }
 
 export const ARDUINO_CODE = `/*
-  3-Slot Smart Parking System for Arduino Uno
-  Hardware:
-    - 3x HC-SR04 Ultrasonic Sensors:
-        Slot 1: TRIG -> Pin 2, ECHO -> Pin 3
-        Slot 2: TRIG -> Pin 4, ECHO -> Pin 5
-        Slot 3: TRIG -> Pin 6, ECHO -> Pin 7
-    - 3x FSR Sensors:
-        Slot 1: A0 (with 10k pulldown to GND)
-        Slot 2: A1 (with 10k pulldown to GND)
-        Slot 3: A2 (with 10k pulldown to GND)
-    - Buzzer: Pin 8
-    - MG995 Servo: Pin 11 (Gate Barrier)
-    - HC-05 Bluetooth Module:
-        HC-05 TXD -> Arduino RX (Pin 0)
-        HC-05 RXD -> Arduino TX (Pin 1 via 1k/2k voltage divider)
-        HC-05 VCC -> 5V, GND -> GND
+  3-Slot Smart Parking System for Arduino Uno + HC-05 Bluetooth
+  School: શ્રી સરકારી માધ્યમિક શાળા લાખાપર
 
-  Logic:
-    - Slot is OCCUPIED when: Distance <= 3.0 cm AND FSR >= 15
-    - When all 3 slots occupied:
-        - Servo moves to 90 degrees (Gate CLOSED)
-        - Buzzer turns ON (Pin 8 HIGH)
-    - Otherwise:
-        - Servo moves to 0 degrees (Gate OPEN)
-        - Buzzer turns OFF (Pin 8 LOW)
-    - Telemetry sent over Serial @ 9600 baud (both USB and HC-05 receive this stream!)
+  HC-05 BLUETOOTH CONNECTION:
+    - HC-05 VCC → Arduino 5V
+    - HC-05 GND → Arduino GND
+    - HC-05 TXD → Arduino D2 (SoftwareSerial RX)
+    - Arduino D3 (SoftwareSerial TX) → 2.2kΩ resistor → HC-05 RXD
+    - HC-05 RXD junction → 3.3kΩ resistor → GND (3.3V logic level divider)
+    - HC-05 EN/KEY pin: NOT CONNECTED
+    - Bluetooth Baud Rate: 9600 baud
+
+  PARKING SENSORS & ACTUATORS:
+    - Slot 1 Ultrasonic: TRIG -> Pin 4, ECHO -> Pin 5
+    - Slot 2 Ultrasonic: TRIG -> Pin 6, ECHO -> Pin 7
+    - Slot 3 Ultrasonic: TRIG -> Pin 9, ECHO -> Pin 10
+    - Buzzer (+): Pin 8 (Active HIGH)
+    - MG995 Gate Servo: Pin 11 (0° = OPEN, 90° = CLOSED)
+
+  TELEMETRY OUTPUT (Both Bluetooth and USB @ 9600 Baud):
+    S1:OCCUPIED (or S1:EMPTY)
+    S2:EMPTY
+    S3:OCCUPIED
+    TOTAL:2
+    GATE:OPEN
 */
 
+#include <SoftwareSerial.h>
 #include <Servo.h>
 
-// HC-SR04 Ultrasonic Pins
-const int TRIG_1 = 2;
-const int ECHO_1 = 3;
-const int TRIG_2 = 4;
-const int ECHO_2 = 5;
-const int TRIG_3 = 6;
-const int ECHO_3 = 7;
+// HC-05 on SoftwareSerial: RX = D2 (from HC-05 TXD), TX = D3 (to HC-05 RXD via 2.2k/3.3k divider)
+SoftwareSerial btSerial(2, 3);
 
-// FSR Analog Pins
-const int FSR_1 = A0;
-const int FSR_2 = A1;
-const int FSR_3 = A2;
+// HC-SR04 Ultrasonic Pins
+const int TRIG_1 = 4;
+const int ECHO_1 = 5;
+const int TRIG_2 = 6;
+const int ECHO_2 = 7;
+const int TRIG_3 = 9;
+const int ECHO_3 = 10;
 
 // Output Actuators
 const int BUZZER_PIN = 8;
@@ -57,9 +55,8 @@ const int SERVO_PIN = 11;
 
 Servo gateServo;
 
-// Thresholds according to hardware spec
-const float DIST_THRESHOLD_CM = 3.0;
-const int FSR_THRESHOLD = 15;
+// Threshold for parking slot detection (distance <= 5.0 cm means occupied)
+const float DIST_THRESHOLD_CM = 5.0;
 
 float readDistanceCM(int trigPin, int echoPin) {
   digitalWrite(trigPin, LOW);
@@ -74,8 +71,11 @@ float readDistanceCM(int trigPin, int echoPin) {
 }
 
 void setup() {
-  // 9600 Baud: Default rate for HC-05 Bluetooth and USB Serial
+  // Serial over USB for PC debugging
   Serial.begin(9600);
+
+  // Serial over HC-05 Bluetooth
+  btSerial.begin(9600);
 
   pinMode(TRIG_1, OUTPUT);
   pinMode(ECHO_1, INPUT);
@@ -92,53 +92,43 @@ void setup() {
 }
 
 void loop() {
-  // 1. Read HC-SR04 Distances
+  // 1. Read distances from ultrasonic sensors
   float d1 = readDistanceCM(TRIG_1, ECHO_1);
   float d2 = readDistanceCM(TRIG_2, ECHO_2);
   float d3 = readDistanceCM(TRIG_3, ECHO_3);
 
-  // 2. Read FSR Analog Sensors
-  int fsr1 = analogRead(FSR_1);
-  int fsr2 = analogRead(FSR_2);
-  int fsr3 = analogRead(FSR_3);
+  // 2. Check occupancy
+  bool occ1 = (d1 <= DIST_THRESHOLD_CM);
+  bool occ2 = (d2 <= DIST_THRESHOLD_CM);
+  bool occ3 = (d3 <= DIST_THRESHOLD_CM);
 
-  // 3. Determine Slot Occupancy: distance <= 3.0 cm AND FSR >= 15
-  bool occ1 = (d1 <= DIST_THRESHOLD_CM && fsr1 >= FSR_THRESHOLD);
-  bool occ2 = (d2 <= DIST_THRESHOLD_CM && fsr2 >= FSR_THRESHOLD);
-  bool occ3 = (d3 <= DIST_THRESHOLD_CM && fsr3 >= FSR_THRESHOLD);
+  int occupiedCount = (occ1 ? 1 : 0) + (occ2 ? 1 : 0) + (occ3 ? 1 : 0);
+  bool allOccupied = (occupiedCount >= 3);
 
-  bool allOccupied = (occ1 && occ2 && occ3);
-
-  // 4. Actuator Control: MG995 Gate & Buzzer
+  // 3. Control Gate Servo & Buzzer
   if (allOccupied) {
     gateServo.write(90);            // 90 deg = Gate CLOSED
-    digitalWrite(BUZZER_PIN, HIGH); // Buzzer ON
+    digitalWrite(BUZZER_PIN, HIGH); // Buzzer Alert
   } else {
     gateServo.write(0);             // 0 deg = Gate OPEN
     digitalWrite(BUZZER_PIN, LOW);  // Buzzer OFF
   }
 
-  // 5. Send Telemetry to Web Dashboard via Serial (9600 Baud)
-  Serial.print("Lot 1 | Distance: "); Serial.print(d1, 1);
-  Serial.print(" cm | Status: "); Serial.println(occ1 ? "OCCUPIED" : "EMPTY");
+  // 4. Send Telemetry to App via HC-05 Bluetooth
+  btSerial.println(occ1 ? "S1:OCCUPIED" : "S1:EMPTY");
+  btSerial.println(occ2 ? "S2:OCCUPIED" : "S2:EMPTY");
+  btSerial.println(occ3 ? "S3:OCCUPIED" : "S3:EMPTY");
+  btSerial.print("TOTAL:"); btSerial.println(occupiedCount);
+  btSerial.print("GATE:"); btSerial.println(allOccupied ? "CLOSED" : "OPEN");
 
-  Serial.print("Lot 2 | Distance: "); Serial.print(d2, 1);
-  Serial.print(" cm | Status: "); Serial.println(occ2 ? "OCCUPIED" : "EMPTY");
+  // Also send to USB Serial for direct laptop debugging
+  Serial.println(occ1 ? "S1:OCCUPIED" : "S1:EMPTY");
+  Serial.println(occ2 ? "S2:OCCUPIED" : "S2:EMPTY");
+  Serial.println(occ3 ? "S3:OCCUPIED" : "S3:EMPTY");
+  Serial.print("TOTAL:"); Serial.println(occupiedCount);
+  Serial.print("GATE:"); Serial.println(allOccupied ? "CLOSED" : "OPEN");
 
-  Serial.print("Lot 3 | Distance: "); Serial.print(d3, 1);
-  Serial.print(" cm | Status: "); Serial.println(occ3 ? "OCCUPIED" : "EMPTY");
-
-  int occupiedCount = (occ1 ? 1 : 0) + (occ2 ? 1 : 0) + (occ3 ? 1 : 0);
-  int emptyCount = 3 - occupiedCount;
-
-  Serial.print("TOTAL OCCUPIED: "); Serial.print(occupiedCount); Serial.print("/3 | ");
-  Serial.print("EMPTY: "); Serial.print(emptyCount); Serial.print(" | ");
-  Serial.print("UNKNOWN: 0 | ");
-  Serial.print("AVAILABLE: "); Serial.print(emptyCount); Serial.print(" | ");
-  Serial.print("GATE: "); Serial.println(allOccupied ? "CLOSED" : "OPEN");
-  Serial.println("-----------------------------------------------------------------------");
-
-  delay(500); // 500ms update cadence
+  delay(600); // 600ms refresh rate
 }
 `;
 
@@ -246,24 +236,25 @@ export const ArduinoGuideModal: React.FC<ArduinoGuideModalProps> = ({
                   isLightMode ? 'bg-slate-50 border-slate-200' : 'bg-slate-900/80 border-slate-800'
                 }`}
               >
-                <span className="text-cyan-600 dark:text-cyan-400 font-bold block mb-1">
-                  HC-SR04 Ultrasonic Sensors:
+                <span className="text-blue-600 dark:text-blue-400 font-bold block mb-1">
+                  HC-05 Bluetooth Module (9600 Baud):
                 </span>
-                <div>Slot 1: TRIG D2, ECHO D3</div>
-                <div>Slot 2: TRIG D4, ECHO D5</div>
-                <div>Slot 3: TRIG D6, ECHO D7</div>
+                <div>TXD → Arduino D2 (Software RX)</div>
+                <div>Arduino D3 → 2.2kΩ → HC-05 RXD</div>
+                <div>HC-05 RXD → 3.3kΩ → GND divider</div>
+                <div>EN/KEY: Not connected · VCC 5V · GND</div>
               </div>
               <div
                 className={`p-2.5 rounded-xl border ${
                   isLightMode ? 'bg-slate-50 border-slate-200' : 'bg-slate-900/80 border-slate-800'
                 }`}
               >
-                <span className="text-indigo-600 dark:text-indigo-400 font-bold block mb-1">
-                  FSR Force Sensors:
+                <span className="text-cyan-600 dark:text-cyan-400 font-bold block mb-1">
+                  HC-SR04 Ultrasonic Sensors:
                 </span>
-                <div>Slot 1 FSR: Pin A0 (with 10k pulldown)</div>
-                <div>Slot 2 FSR: Pin A1 (with 10k pulldown)</div>
-                <div>Slot 3 FSR: Pin A2 (with 10k pulldown)</div>
+                <div>Slot 1: TRIG D4, ECHO D5</div>
+                <div>Slot 2: TRIG D6, ECHO D7</div>
+                <div>Slot 3: TRIG D9, ECHO D10</div>
               </div>
               <div
                 className={`p-2.5 rounded-xl border ${
@@ -271,7 +262,7 @@ export const ArduinoGuideModal: React.FC<ArduinoGuideModalProps> = ({
                 }`}
               >
                 <span className="text-rose-600 dark:text-rose-400 font-bold block mb-1">
-                  MG995 Gate Servo (D11):
+                  MG995 Gate Servo (Pin D11):
                 </span>
                 <div>Signal: Pin D11, VCC: 5V, GND: GND</div>
                 <div className="text-[11px] text-slate-500">0° = Gate OPEN | 90° = Gate CLOSED</div>
@@ -281,11 +272,11 @@ export const ArduinoGuideModal: React.FC<ArduinoGuideModalProps> = ({
                   isLightMode ? 'bg-slate-50 border-slate-200' : 'bg-slate-900/80 border-slate-800'
                 }`}
               >
-                <span className="text-blue-600 dark:text-blue-400 font-bold block mb-1">
-                  HC-05 Bluetooth Module:
+                <span className="text-amber-600 dark:text-amber-400 font-bold block mb-1">
+                  Buzzer Alert (Pin D8):
                 </span>
-                <div>TXD → Pin 0 (RX), RXD → Pin 1 (TX)</div>
-                <div className="text-[11px] text-slate-500">Buzzer (+): Pin D8 (Active HIGH)</div>
+                <div>Positive (+): Pin D8 (Active HIGH)</div>
+                <div>Negative (-): Arduino GND</div>
               </div>
             </div>
           </div>

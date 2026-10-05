@@ -1,9 +1,44 @@
-import {createRoot} from 'react-dom/client';
+import { createRoot } from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
-import { registerSW } from 'virtual:pwa-register';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
-// Register Service Worker for 100% offline caching and PWA installation
-registerSW({ immediate: true });
+// Mount React immediately
+const rootEl = document.getElementById('root');
+if (rootEl) {
+  createRoot(rootEl).render(
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>
+  );
+}
 
-createRoot(document.getElementById('root')!).render(<App />);
+// Safely register Service Worker only in standalone top-level windows in production
+try {
+  let isTop = false;
+  try {
+    isTop = window.self === window.top;
+  } catch {
+    isTop = false;
+  }
+
+  if (
+    typeof window !== 'undefined' &&
+    'serviceWorker' in navigator &&
+    isTop &&
+    import.meta.env.PROD
+  ) {
+    import('virtual:pwa-register')
+      .then(({ registerSW }) => {
+        try {
+          registerSW({ immediate: false });
+        } catch {
+          // SW skipped
+        }
+      })
+      .catch(() => {});
+  }
+} catch {
+  // SW skipped
+}
+

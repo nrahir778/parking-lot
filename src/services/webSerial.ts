@@ -53,6 +53,55 @@ export class SerialLineParser {
       return { type: 'ignored', raw: trimmed };
     }
 
+    // 0.1 Check for short Arduino HC-05 format:
+    // e.g. "S1:OCCUPIED", "S1:1", "S2:EMPTY", "S2:0", "S3:OCCUPIED", "S3:1"
+    const hc05SlotMatch = trimmed.match(/^S([1-3])\s*[:=]\s*(OCCUPIED|EMPTY|AVAILABLE|UNKNOWN|VACANT|[01])\b/i);
+    if (hc05SlotMatch) {
+      const slotNum = parseInt(hc05SlotMatch[1], 10) as 1 | 2 | 3;
+      const rawVal = hc05SlotMatch[2].toUpperCase();
+      let status: 'EMPTY' | 'OCCUPIED' | 'UNKNOWN' = 'UNKNOWN';
+      if (rawVal === 'OCCUPIED' || rawVal === '1') {
+        status = 'OCCUPIED';
+      } else if (rawVal === 'EMPTY' || rawVal === 'AVAILABLE' || rawVal === 'VACANT' || rawVal === '0') {
+        status = 'EMPTY';
+      }
+
+      return {
+        type: 'slot',
+        data: {
+          slotId: slotNum,
+          distance: status === 'OCCUPIED' ? 2.5 : 25.0,
+          unit: 'cm',
+          status,
+          raw: trimmed,
+        },
+      };
+    }
+
+    // 0.2 Check for short Total Occupied format:
+    // e.g. "TOTAL:2", "TOTAL: 2", "TOTAL: 2/3"
+    const hc05TotalMatch = trimmed.match(/^TOTAL\s*[:=]\s*(\d+)(?:\s*\/\s*(\d+))?$/i);
+    if (hc05TotalMatch) {
+      const totalOccupied = parseInt(hc05TotalMatch[1], 10);
+      const totalSlots = hc05TotalMatch[2] ? parseInt(hc05TotalMatch[2], 10) : 3;
+      const empty = Math.max(0, totalSlots - totalOccupied);
+      const gate: 'OPEN' | 'CLOSED' = totalOccupied >= totalSlots ? 'CLOSED' : 'OPEN';
+
+      return {
+        type: 'summary',
+        data: {
+          totalOccupied,
+          totalSlots,
+          occupiedFraction: `${totalOccupied}/${totalSlots}`,
+          empty,
+          unknown: 0,
+          available: empty,
+          gate,
+          raw: trimmed,
+        },
+      };
+    }
+
     // 1. Check for Summary telemetry line:
     // e.g. "TOTAL OCCUPIED: 1/3 | EMPTY: 2 | UNKNOWN: 0 | AVAILABLE: 2 | GATE: OPEN"
     if (/(?:TOTAL\s*OCCUPIED|OCCUPIED\s*:)/i.test(trimmed) && /(?:EMPTY|AVAILABLE|UNKNOWN)/i.test(trimmed)) {

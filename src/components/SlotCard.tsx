@@ -111,13 +111,13 @@ export const SlotCard: React.FC<SlotCardProps> = ({
           >
             {isOccupied && isConnected ? (
               <>
-                <ShieldAlert className="w-3 h-3" />
+                <span className="text-xs">🔴</span>
                 <span>OCCUPIED</span>
               </>
             ) : isEmpty && isConnected ? (
               <>
-                <ShieldCheck className="w-3 h-3" />
-                <span>AVAILABLE</span>
+                <span className="text-xs">🟢</span>
+                <span>EMPTY</span>
               </>
             ) : (
               <>

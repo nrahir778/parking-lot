@@ -504,7 +504,7 @@ export const IsometricParkingLot: React.FC<IsometricParkingLotProps> = ({
                                 isEmpty ? 'text-emerald-400' : 'text-slate-400'
                               }`}
                             >
-                              {isEmpty ? 'AVAILABLE' : 'STANDBY'}
+                              {isEmpty ? 'EMPTY' : 'STANDBY'}
                             </span>
                           </div>
                         )}

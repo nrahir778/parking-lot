@@ -81,29 +81,45 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
         </div>
       </div>
 
-      {/* Zone 2: System Status Indicator (Desktop/Tablet) */}
+      {/* Zone 2: System Status Indicator */}
       <div
-        className={`hidden lg:flex items-center gap-2 text-xs font-mono shrink-0 ${
-          isLight ? 'text-slate-600' : 'text-slate-400'
+        className={`hidden md:flex items-center gap-1.5 text-xs font-mono shrink-0 px-2.5 py-1 rounded-xl border transition-all ${
+          connectionMode === 'connected_bt'
+            ? isLight
+              ? 'bg-blue-50 border-blue-200 text-blue-800'
+              : 'bg-blue-950/40 border-blue-500/40 text-blue-300'
+            : connectionMode === 'connected_usb'
+            ? isLight
+              ? 'bg-cyan-50 border-cyan-200 text-cyan-800'
+              : 'bg-cyan-950/40 border-cyan-500/40 text-cyan-300'
+            : isConnecting
+            ? isLight
+              ? 'bg-amber-50 border-amber-300 text-amber-800'
+              : 'bg-amber-950/40 border-amber-500/40 text-amber-300'
+            : isLight
+            ? 'bg-rose-50/60 border-rose-200 text-rose-700'
+            : 'bg-slate-900/60 border-slate-700/60 text-slate-400'
         }`}
       >
-        <span
-          className={`w-2 h-2 rounded-full ${
-            isConnected
-              ? 'bg-emerald-500 shadow-[0_0_8px_#10b981]'
+        <Bluetooth
+          className={`w-3.5 h-3.5 shrink-0 ${
+            connectionMode === 'connected_bt'
+              ? 'text-blue-500 dark:text-cyan-400'
+              : connectionMode === 'connected_usb'
+              ? 'text-cyan-500'
               : isConnecting
-              ? 'bg-amber-400 animate-ping'
-              : 'bg-slate-400'
+              ? 'text-amber-400 animate-pulse'
+              : 'text-rose-500 dark:text-rose-400'
           }`}
         />
-        <span className="font-semibold">
-          {connectionMode === 'connected_usb'
-            ? `USB: ${portLabel || 'ARDUINO'}`
-            : connectionMode === 'connected_bt'
-            ? `BLUETOOTH: ${portLabel || 'HC-05'}`
+        <span className="font-bold text-[11px] sm:text-xs">
+          {connectionMode === 'connected_bt'
+            ? 'HC-05 Connected'
+            : connectionMode === 'connected_usb'
+            ? `USB: ${portLabel || 'Connected'}`
             : isConnecting
-            ? 'CONNECTING...'
-            : 'DISCONNECTED'}
+            ? 'Connecting...'
+            : 'Bluetooth Disconnected'}
         </span>
       </div>
 
@@ -193,7 +209,7 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
               title="Connect wirelessly via Bluetooth"
             >
               <Bluetooth className="w-3.5 h-3.5" />
-              <span>Connect</span>
+              <span>Connect Bluetooth</span>
             </button>
 
             {/* Connect USB Cable (Secondary for OTG / PC) */}

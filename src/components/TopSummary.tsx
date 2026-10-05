@@ -13,6 +13,7 @@ import {
   IndianRupee,
   Receipt,
   Laptop,
+  AlertTriangle,
 } from 'lucide-react';
 import { downloadArduinoInoFile } from '../utils/downloadFirmware';
 
@@ -54,7 +55,7 @@ export const TopSummary: React.FC<TopSummaryProps> = ({
 
   const isConnected = connectionMode === 'connected_usb' || connectionMode === 'connected_bt';
   const secondsSinceLastData = lastDataReceivedAt ? Math.round((now - lastDataReceivedAt) / 1000) : null;
-  const isStale = isConnected && secondsSinceLastData !== null && secondsSinceLastData > 6;
+  const isStale = isConnected && secondsSinceLastData !== null && secondsSinceLastData >= 5;
 
   const totalSlots = arduinoSummary ? arduinoSummary.totalSlots : slots.length;
   const occupiedCount = isConnected
@@ -118,13 +119,20 @@ export const TopSummary: React.FC<TopSummaryProps> = ({
                 </span>
               )}
               <span className="hidden sm:inline opacity-40">·</span>
-              <span className="text-[10px] sm:text-[11px] opacity-80">
-                {secondsSinceLastData !== null && secondsSinceLastData <= 1
-                  ? 'Live Stream'
-                  : secondsSinceLastData !== null
-                  ? `${secondsSinceLastData}s ago`
-                  : 'Active'}
-              </span>
+              {isStale ? (
+                <span className="text-[10px] sm:text-[11px] font-bold text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                  <AlertTriangle className="w-3 h-3 text-amber-500 shrink-0" />
+                  <span>Connection may be lost</span>
+                </span>
+              ) : (
+                <span className="text-[10px] sm:text-[11px] opacity-80">
+                  {secondsSinceLastData !== null && secondsSinceLastData <= 1
+                    ? 'Live Stream'
+                    : secondsSinceLastData !== null
+                    ? `${secondsSinceLastData}s ago`
+                    : 'Active'}
+                </span>
+              )}
             </>
           ) : (
             <div className="flex items-center gap-1.5 text-[11px]">

@@ -25,6 +25,8 @@ import { PermissionPromptModal } from './components/PermissionPromptModal';
 import { ReceiptsModal } from './components/ReceiptsModal';
 import { ChromeOSGuideModal } from './components/ChromeOSGuideModal';
 import { InAppToastContainer } from './components/InAppToastContainer';
+import { TrafficLightCard } from './components/TrafficLightCard';
+import { BluetoothDiagnostics } from './components/BluetoothDiagnostics';
 import { notificationService } from './services/notificationService';
 import { downloadArduinoInoFile } from './utils/downloadFirmware';
 import {
@@ -112,7 +114,7 @@ export default function App() {
   const [arduinoSummary, setArduinoSummary] = useState<ArduinoSummaryData | null>(null);
   const [lastDataReceivedAt, setLastDataReceivedAt] = useState<number | null>(null);
   const [connectionMode, setConnectionMode] = useState<ConnectionMode>('disconnected');
-  const [theme, setTheme] = useState<ThemeMode>('light');
+  const [theme, setTheme] = useState<ThemeMode>('dark');
   const [isBrowserSupported, setIsBrowserSupported] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [logs, setLogs] = useState<SerialLogEntry[]>([]);
@@ -126,6 +128,15 @@ export default function App() {
   const [isChromeOSModalOpen, setIsChromeOSModalOpen] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [isPWAInstalled, setIsPWAInstalled] = useState(false);
+
+  // Traffic Light & Exit Signal Transition Engine
+  const [isExitingOrange, setIsExitingOrange] = useState(false);
+  const wasFullRef = React.useRef(false);
+  const exitingTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+
+  // Diagnostics counters
+  const [validMessageCount, setValidMessageCount] = useState(0);
+  const [lastRawMessage, setLastRawMessage] = useState<string>('');
 
   // Detect ChromeOS user agent
   const isChromeOS = typeof navigator !== 'undefined' && /CrOS|Chromebook/i.test(navigator.userAgent);
@@ -380,6 +391,10 @@ export default function App() {
         return;
       }
 
+      // Record valid message for diagnostics
+      setValidMessageCount((prev) => prev + 1);
+      setLastRawMessage(clean);
+
       // 1. Individual Lot / Slot reading line
       // e.g. "Lot 1 | Distance: 3.1 cm | Status: EMPTY"
       if (parsed.type === 'slot') {
@@ -515,6 +530,36 @@ export default function App() {
     const supported = ArduinoSerialManager.isSupported() || HC05BluetoothManager.isSupported();
     setIsBrowserSupported(supported);
   }, []);
+
+  // Traffic Light Logic: Track Full -> Exit Transition (ORANGE blinking for 3 seconds)
+  const effectiveOccupiedCount = arduinoSummary
+    ? arduinoSummary.totalOccupied
+    : slots.filter((s) => s.status === 'OCCUPIED').length;
+
+  useEffect(() => {
+    // Condition 3: If all 3 slots are occupied -> Mark wasFull as true
+    if (effectiveOccupiedCount >= 3) {
+      wasFullRef.current = true;
+      if (isExitingOrange) {
+        if (exitingTimeoutRef.current) clearTimeout(exitingTimeoutRef.current);
+        setIsExitingOrange(false);
+      }
+    } else if (wasFullRef.current && effectiveOccupiedCount < 3) {
+      // Condition 4: When a vehicle leaves after the parking was full:
+      // Show ORANGE blinking status temporarily ("VEHICLE EXITING...").
+      // Keep orange blinking for approximately 3 seconds, then transition automatically to GREEN/YELLOW.
+      wasFullRef.current = false;
+      setIsExitingOrange(true);
+
+      if (exitingTimeoutRef.current) {
+        clearTimeout(exitingTimeoutRef.current);
+      }
+
+      exitingTimeoutRef.current = setTimeout(() => {
+        setIsExitingOrange(false);
+      }, 3000);
+    }
+  }, [effectiveOccupiedCount, isExitingOrange]);
 
   // Connect via USB Cable (9600 Baud)
   const handleConnectUSB = async () => {
@@ -820,6 +865,16 @@ export default function App() {
           isChromeOS={isChromeOS}
         />
 
+        {/* Traffic Light Status (Green: Space Available / Yellow: Almost Full / Red: Parking Full / Orange Blinking: Vehicle Exiting) */}
+        <TrafficLightCard
+          occupiedCount={effectiveOccupiedCount}
+          totalSlots={arduinoSummary ? arduinoSummary.totalSlots : slots.length}
+          freeCount={Math.max(0, (arduinoSummary ? arduinoSummary.totalSlots : slots.length) - effectiveOccupiedCount)}
+          isExitingOrange={isExitingOrange}
+          gateStatus={effectiveOccupiedCount >= 3 ? 'CLOSED' : (arduinoSummary ? arduinoSummary.gate : gateState.status)}
+          isLightMode={isLight}
+        />
+
         {/* 3D Isometric Parking Yard (Sleek Mobile Controls & Realistic Graphics) */}
         <IsometricParkingLot
           slots={slots}
@@ -854,6 +909,16 @@ export default function App() {
             />
           ))}
         </div>
+
+        {/* Real-Time Bluetooth Hardware Diagnostics */}
+        <BluetoothDiagnostics
+          connectionMode={connectionMode}
+          portLabel={portLabel}
+          lastRawMessage={lastRawMessage}
+          lastDataReceivedAt={lastDataReceivedAt}
+          validMessageCount={validMessageCount}
+          isLightMode={isLight}
+        />
 
         {/* Arduino Serial Monitor Console */}
         <SerialConsole
@@ -935,6 +1000,7 @@ export default function App() {
         onConnectBluetooth={handleConnectBluetooth}
         onDisconnect={handleDisconnect}
         onConnectUSB={handleConnectUSB}
+        onSimulateTelemetry={(lines) => lines.forEach((l) => handleIncomingSerialLine(l))}
         isLightMode={isLight}
       />
 

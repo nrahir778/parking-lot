@@ -27,6 +27,7 @@ interface BluetoothConnectModalProps {
   onConnectBluetooth: (deviceId?: string) => Promise<void>;
   onDisconnect: () => Promise<void>;
   onConnectUSB: () => Promise<void>;
+  onSimulateTelemetry?: (lines: string[]) => void;
   isLightMode?: boolean;
 }
 
@@ -38,6 +39,7 @@ export const BluetoothConnectModal: React.FC<BluetoothConnectModalProps> = ({
   onConnectBluetooth,
   onDisconnect,
   onConnectUSB,
+  onSimulateTelemetry,
   isLightMode = false,
 }) => {
   const [isScanning, setIsScanning] = useState(false);
@@ -329,12 +331,15 @@ export const BluetoothConnectModal: React.FC<BluetoothConnectModalProps> = ({
           }`}
         >
           <div
-            className={`font-semibold flex items-center gap-1.5 font-mono ${
+            className={`font-semibold flex items-center justify-between font-mono ${
               isLightMode ? 'text-cyan-700' : 'text-cyan-400'
             }`}
           >
-            <Cpu className="w-3.5 h-3.5" />
-            <span>HC-05 Quick Wiring Checklist</span>
+            <div className="flex items-center gap-1.5">
+              <Cpu className="w-3.5 h-3.5" />
+              <span>HC-05 Arduino UNO Wiring (9600 Baud)</span>
+            </div>
+            <span className="text-[10px] text-slate-500 font-bold">Bluetooth Classic SPP</span>
           </div>
           <ul
             className={`space-y-1 list-disc list-inside text-[11px] leading-relaxed ${
@@ -342,21 +347,97 @@ export const BluetoothConnectModal: React.FC<BluetoothConnectModalProps> = ({
             }`}
           >
             <li>
-              <strong>VCC:</strong> 5V from Arduino Uno &middot; <strong>GND:</strong> GND
+              <strong>VCC:</strong> Arduino 5V &middot; <strong>GND:</strong> Arduino GND
             </li>
             <li>
-              <strong>TXD of HC-05:</strong> Connect to <strong>Pin 10</strong> (RX) of Uno
+              <strong>HC-05 TXD:</strong> Connect to Arduino <strong>D2</strong> (SoftwareSerial RX)
             </li>
             <li>
-              <strong>RXD of HC-05:</strong> Connect to <strong>Pin 11</strong> (TX) via 1k/2k
-              divider
+              <strong>Arduino D3:</strong> Connect to <strong>2.2kΩ resistor</strong> &rarr; HC-05 RXD
             </li>
             <li>
-              <strong>Baud Rate:</strong> 9600 baud &middot; <strong>Pairing PIN:</strong> 1234 or
-              0000
+              <strong>HC-05 RXD junction:</strong> Connect to <strong>3.3kΩ resistor</strong> &rarr; GND
+            </li>
+            <li>
+              <strong>EN/KEY pin:</strong> Leave <strong>NOT connected</strong>
+            </li>
+            <li>
+              <strong>Baud Rate:</strong> 9600 baud &middot; <strong>Pairing PIN:</strong> 1234 or 0000
             </li>
           </ul>
         </div>
+
+        {/* HC-05 Classic Bluetooth Note */}
+        <div
+          className={`p-3 rounded-xl border text-xs space-y-1 ${
+            isLightMode ? 'bg-blue-50/70 border-blue-200 text-slate-700' : 'bg-blue-950/20 border-blue-500/30 text-slate-300'
+          }`}
+        >
+          <div className="flex items-center gap-1.5 font-bold text-blue-600 dark:text-blue-400">
+            <Info className="w-3.5 h-3.5" />
+            <span>HC-05 Classic SPP Compatibility</span>
+          </div>
+          <p className="text-[11px] leading-relaxed">
+            HC-05 uses Bluetooth Classic (RFCOMM/SPP). Standard web browsers only scan BLE GATT. On Android, build the <strong>Native Android APK</strong> (or pair HC-05 in Android Bluetooth settings), or connect Arduino directly via <strong>USB OTG / Web Serial</strong> at 9600 baud.
+          </p>
+        </div>
+
+        {/* Test Packet Simulator Buttons */}
+        {onSimulateTelemetry && (
+          <div
+            className={`p-3 rounded-xl border space-y-2 ${
+              isLightMode ? 'bg-slate-50 border-slate-200' : 'bg-slate-900/60 border-slate-800'
+            }`}
+          >
+            <div className="flex items-center justify-between text-xs font-mono font-bold">
+              <span className="text-slate-400">Simulate HC-05 Telemetry Packets:</span>
+            </div>
+            <div className="flex flex-wrap gap-1.5 text-xs font-mono">
+              <button
+                onClick={() => {
+                  onSimulateTelemetry([
+                    'S1:OCCUPIED',
+                    'S2:EMPTY',
+                    'S3:OCCUPIED',
+                    'TOTAL:2',
+                    'GATE:OPEN',
+                  ]);
+                }}
+                className="px-2.5 py-1 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/40 text-[11px] font-bold transition-colors cursor-pointer"
+              >
+                2 Occupied (S1:OCCUPIED, TOTAL:2)
+              </button>
+              <button
+                onClick={() => {
+                  onSimulateTelemetry([
+                    'S1:1',
+                    'S2:1',
+                    'S3:1',
+                    'TOTAL:3',
+                    'GATE:CLOSED',
+                  ]);
+                }}
+                className="px-2.5 py-1 rounded-lg bg-rose-600/20 hover:bg-rose-600/30 text-rose-400 border border-rose-500/40 text-[11px] font-bold transition-colors cursor-pointer"
+              >
+                Full (S1:1, S2:1, S3:1, TOTAL:3)
+              </button>
+              <button
+                onClick={() => {
+                  onSimulateTelemetry([
+                    'S1:EMPTY',
+                    'S2:EMPTY',
+                    'S3:OCCUPIED',
+                    'TOTAL:1',
+                    'GATE:OPEN',
+                  ]);
+                }}
+                className="px-2.5 py-1 rounded-lg bg-amber-600/20 hover:bg-amber-600/30 text-amber-400 border border-amber-500/40 text-[11px] font-bold transition-colors cursor-pointer"
+              >
+                Car Exit (S1:EMPTY, TOTAL:1)
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Alternatives */}
         <div
