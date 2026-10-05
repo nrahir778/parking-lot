@@ -3,9 +3,9 @@ apply plugin: 'com.android.application'
 def getBuildVersionCode() {
     def runNum = System.getenv("GITHUB_RUN_NUMBER")
     if (runNum != null && runNum.isInteger()) {
-        return 1000 + Integer.parseInt(runNum)
+        return 2000 + Integer.parseInt(runNum)
     }
-    return (int) (System.currentTimeMillis() / 60000)
+    return 2002
 }
 
 def getBuildVersionName() {
@@ -13,7 +13,7 @@ def getBuildVersionName() {
     if (runNum != null) {
         return "1.0." + runNum
     }
-    return "1.0.1"
+    return "1.0.2"
 }
 
 android {

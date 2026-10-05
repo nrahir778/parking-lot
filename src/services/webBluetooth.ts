@@ -1,10 +1,10 @@
 // Universal Bluetooth Manager for Smart Parking System
 // Supports:
-// 1. Android Native APK (Capacitor BLE via @capacitor-community/bluetooth-le)
-// 2. Desktop & Mobile Chrome (Web Bluetooth API)
-// 3. HC-05 / HM-10 / CC2541 / ESP32 Serial UART modules
+// 1. Android Native APK - Bluetooth Classic SPP (HC-05 / HC-06) via native BluetoothClassicSerialPlugin
+// 2. Android Native APK - Bluetooth Low Energy (HM-10 / CC2541 / ESP32) via BleClient
+// 3. Desktop & Mobile Chromium Browser (Web Bluetooth API & Web Serial USB OTG)
 
-import { Capacitor } from '@capacitor/core';
+import { Capacitor, registerPlugin } from '@capacitor/core';
 import { BleClient, ScanResult } from '@capacitor-community/bluetooth-le';
 
 // Common Bluetooth Serial / UART Service UUIDs
@@ -19,10 +19,24 @@ export const UART_CHARACTERISTIC_RX_UUIDS = [
   '6e400003-b5a3-f393-e0a9-e50e24dcca9e', // Nordic UART TX (Receive on phone)
 ];
 
+export interface BluetoothClassicSerialPlugin {
+  isEnabled(): Promise<{ enabled: boolean }>;
+  listPairedDevices(): Promise<{ devices: Array<{ name: string; address: string; type: string }> }>;
+  connect(options?: { address?: string }): Promise<{ connected: boolean; name: string; address: string }>;
+  disconnect(): Promise<{ disconnected: boolean }>;
+  write(options: { data: string }): Promise<void>;
+  addListener(eventName: 'data', listenerFunc: (data: { line: string }) => void): Promise<any>;
+  addListener(eventName: 'disconnected', listenerFunc: () => void): Promise<any>;
+  removeAllListeners(): Promise<void>;
+}
+
+export const BluetoothClassicSerial = registerPlugin<BluetoothClassicSerialPlugin>('BluetoothClassicSerial');
+
 export interface DiscoveredBluetoothDevice {
   id: string;
   name: string;
   rssi?: number;
+  type?: 'classic' | 'ble';
   nativeResult?: any;
 }
 
@@ -35,10 +49,11 @@ export class HC05BluetoothManager {
   private buffer = '';
   private isScanning = false;
   private isNativeBleInitialized = false;
+  private isClassicConnected = false;
 
   public static isSupported(): boolean {
     if (Capacitor.isNativePlatform()) {
-      return true; // Supported natively on Android via Capacitor
+      return true; // Supported natively on Android for both Classic (HC-05) and BLE (HM-10)
     }
     if (typeof window !== 'undefined' && 'bluetooth' in navigator) {
       return true; // Supported via Web Bluetooth in Chromium
@@ -77,26 +92,46 @@ export class HC05BluetoothManager {
   }
 
   /**
-   * Scan for nearby Bluetooth devices
+   * Scan for nearby Bluetooth devices (Classic HC-05 paired devices + BLE peripherals)
    */
   public async scanForDevices(
     onDeviceFound: (device: DiscoveredBluetoothDevice) => void,
-    timeoutMs = 10000
+    timeoutMs = 8000
   ): Promise<void> {
     if (this.isScanning) {
       await this.stopScan();
     }
 
     if (Capacitor.isNativePlatform()) {
+      const foundMap = new Map<string, DiscoveredBluetoothDevice>();
+
+      // 1. First, query all paired Classic Bluetooth devices (HC-05 / HC-06)
+      try {
+        const paired = await BluetoothClassicSerial.listPairedDevices();
+        if (paired && paired.devices) {
+          for (const dev of paired.devices) {
+            const item: DiscoveredBluetoothDevice = {
+              id: dev.address,
+              name: dev.name || 'HC-05 Classic Bluetooth',
+              type: 'classic',
+            };
+            foundMap.set(dev.address, item);
+            onDeviceFound(item);
+          }
+        }
+      } catch (err) {
+        console.warn('BluetoothClassicSerial.listPairedDevices warning:', err);
+      }
+
+      // 2. Also scan for BLE modules (HM-10 / AT-09 / CC2541)
       await this.ensureNativeBleInit();
       try {
         const isEnabled = await BleClient.isEnabled();
         if (!isEnabled) {
-          await BleClient.requestEnable();
+          await BleClient.requestEnable().catch(() => {});
         }
 
         this.isScanning = true;
-        const foundMap = new Map<string, DiscoveredBluetoothDevice>();
 
         await BleClient.requestLEScan(
           {
@@ -110,6 +145,7 @@ export class HC05BluetoothManager {
               id,
               name,
               rssi: result.rssi,
+              type: 'ble',
               nativeResult: result,
             };
             if (!foundMap.has(id)) {
@@ -126,14 +162,16 @@ export class HC05BluetoothManager {
         }, timeoutMs);
       } catch (err) {
         this.isScanning = false;
-        throw err;
+        // If we found paired classic devices, don't fail completely
+        if (foundMap.size === 0) {
+          throw err;
+        }
       }
     } else {
       // In Web Bluetooth, active background scanning is restricted by browser security policies;
-      // We trigger the standard browser Bluetooth device picker
       if (!('bluetooth' in navigator)) {
         throw new Error(
-          'Web Bluetooth is not available in this browser. Please use Chrome on Android or desktop.'
+          'Web Bluetooth is not available in this browser. Please use Chrome on Android or connect via USB OTG cable.'
         );
       }
     }
@@ -151,23 +189,57 @@ export class HC05BluetoothManager {
   }
 
   /**
-   * Connect to a specific device ID (native) or open browser device selector
+   * Connect to HC-05 (Classic Bluetooth SPP) or BLE module
    */
   public async connect(targetDeviceId?: string): Promise<boolean> {
-    // A. Native Android Capacitor Platform
+    // A. Native Android Platform (Supports Old HC-05 Classic Bluetooth + BLE)
     if (Capacitor.isNativePlatform()) {
+      // 1. Attempt Native Bluetooth Classic SPP first (for HC-05 / HC-06)
+      try {
+        const res = await BluetoothClassicSerial.connect({ address: targetDeviceId });
+        if (res && res.connected) {
+          this.connectedDeviceId = res.address;
+          this.connectedDeviceName = res.name || 'HC-05 Bluetooth (Classic SPP)';
+          this.isClassicConnected = true;
+
+          await BluetoothClassicSerial.removeAllListeners().catch(() => {});
+          await BluetoothClassicSerial.addListener('data', (d: { line: string }) => {
+            if (d.line && this.onLineReceivedCallback) {
+              this.onLineReceivedCallback(d.line);
+            }
+          });
+          await BluetoothClassicSerial.addListener('disconnected', () => {
+            this.cleanup();
+            if (this.onDisconnectCallback) {
+              this.onDisconnectCallback();
+            }
+          });
+
+          return true;
+        }
+      } catch (classicErr: any) {
+        console.warn('Native Classic Bluetooth connect attempted:', classicErr?.message || classicErr);
+        // If an explicit address was passed or it was an HC-05, throw the clear error
+        if (targetDeviceId && targetDeviceId.includes(':')) {
+          throw new Error(
+            classicErr?.message ||
+              'Failed to connect to HC-05. Please make sure HC-05 is powered and paired in Android Settings with PIN 1234.'
+          );
+        }
+      }
+
+      // 2. Fallback to Native BLE (for HM-10 / CC2541)
       await this.ensureNativeBleInit();
       try {
         let deviceId = targetDeviceId;
 
         if (!deviceId) {
-          // Open native device picker
           const device = await BleClient.requestDevice({
             services: [],
             optionalServices: UART_SERVICE_UUIDS,
           });
           deviceId = device.deviceId;
-          this.connectedDeviceName = device.name || 'Arduino HC-05';
+          this.connectedDeviceName = device.name || 'Arduino Wireless';
         }
 
         if (!deviceId) {
@@ -175,6 +247,8 @@ export class HC05BluetoothManager {
         }
 
         this.connectedDeviceId = deviceId;
+        this.isClassicConnected = false;
+
         await BleClient.connect(deviceId, (disconnectedId) => {
           console.log(`Native Bluetooth device disconnected: ${disconnectedId}`);
           this.cleanup();
@@ -212,7 +286,7 @@ export class HC05BluetoothManager {
       }
     }
 
-    // B. Standard Web Bluetooth API (Chrome / Edge)
+    // B. Standard Web Bluetooth API (Chrome / Edge Browser)
     if (!('bluetooth' in navigator)) {
       throw new Error(
         'Web Bluetooth is not supported in this browser. Please use Google Chrome on Android or connect via USB OTG cable.'
@@ -226,7 +300,6 @@ export class HC05BluetoothManager {
         };
       };
 
-      // Attempt 1: Universal scan with all known serial UUIDs
       try {
         this.webDevice = await nav.bluetooth.requestDevice({
           acceptAllDevices: true,
@@ -239,13 +312,11 @@ export class HC05BluetoothManager {
           ],
         });
       } catch (firstErr: any) {
-        // If user cancelled, rethrow
         if (firstErr?.name === 'NotFoundError') {
           throw new Error(
-            'HC-05 not showing up in the scan list? HC-05 uses Bluetooth Classic (SPP), while Chrome only discovers BLE (Bluetooth Low Energy like HM-10/AT-09). Also make sure Location (GPS) is turned ON in your Android settings. Alternatively, connect directly via USB OTG cable.'
+            'HC-05 not showing up in browser? Web Bluetooth in Chrome only discovers BLE devices (like HM-10/AT-09). To use old HC-05, install the Native Android APK (which supports classic HC-05) or connect via USB OTG cable.'
           );
         }
-        // Attempt 2: Try with namePrefix filter if acceptAllDevices failed
         this.webDevice = await nav.bluetooth.requestDevice({
           filters: [
             { namePrefix: 'HC' },
@@ -299,7 +370,7 @@ export class HC05BluetoothManager {
       }
 
       if (!service) {
-        throw new Error('Could not find compatible UART / Serial service on HC-05 device.');
+        throw new Error('Could not find compatible UART / Serial service on device.');
       }
 
       const characteristics = await service.getCharacteristics();
@@ -341,8 +412,13 @@ export class HC05BluetoothManager {
 
   public disconnect(): void {
     try {
-      if (Capacitor.isNativePlatform() && this.connectedDeviceId) {
-        BleClient.disconnect(this.connectedDeviceId).catch(() => {});
+      if (Capacitor.isNativePlatform()) {
+        if (this.isClassicConnected) {
+          BluetoothClassicSerial.disconnect().catch(() => {});
+        }
+        if (this.connectedDeviceId) {
+          BleClient.disconnect(this.connectedDeviceId).catch(() => {});
+        }
       } else if (this.webDevice?.gatt?.connected) {
         this.webDevice.gatt.disconnect();
       }
@@ -361,6 +437,7 @@ export class HC05BluetoothManager {
     this.webDevice = null;
     this.buffer = '';
     this.isScanning = false;
+    this.isClassicConnected = false;
   }
 }
 

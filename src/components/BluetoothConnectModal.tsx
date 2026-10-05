@@ -21,6 +21,7 @@ import {
   KeyRound,
   Radio,
 } from 'lucide-react';
+import { Capacitor } from '@capacitor/core';
 import { hc05Bluetooth, DiscoveredBluetoothDevice } from '../services/webBluetooth';
 import { ConnectionMode } from '../types';
 import { downloadArduinoInoFile } from '../utils/downloadFirmware';
@@ -60,6 +61,9 @@ export const BluetoothConnectModal: React.FC<BluetoothConnectModalProps> = ({
       setErrorStatus(null);
       setDiscoveredDevices([]);
       setIsScanning(false);
+    } else if (Capacitor.isNativePlatform()) {
+      // Auto-load paired HC-05 devices immediately on native Android
+      handleStartScan();
     }
   }, [isOpen]);
 
