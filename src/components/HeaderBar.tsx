@@ -53,23 +53,23 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
       }`}
     >
       {/* Zone 1: Clean Brand & School Title */}
-      <div className="flex items-center gap-2.5 min-w-0">
+      <div className="flex items-center gap-2 min-w-0 flex-1 overflow-hidden">
         <img
           src="/pwa-192x192.png"
           alt="Smart Parking"
-          className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl border border-amber-400/50 shadow-md object-cover shrink-0"
+          className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl border border-amber-400/50 shadow-md object-cover shrink-0"
         />
-        <div className="flex flex-col min-w-0">
-          <div className="flex items-center gap-1.5 flex-nowrap">
-            <span className="text-sm sm:text-base font-black tracking-tight whitespace-nowrap">
+        <div className="flex flex-col min-w-0 overflow-hidden">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <span className="text-xs sm:text-base font-black tracking-tight truncate">
               Smart Parking
             </span>
-            <span className="px-2 py-0.5 rounded-lg text-[11px] font-gujarati font-extrabold bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30 whitespace-nowrap shrink-0">
+            <span className="hidden sm:inline-block px-1.5 py-0.5 rounded-lg text-[10px] sm:text-[11px] font-gujarati font-extrabold bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30 whitespace-nowrap shrink-0">
               લાખાપર
             </span>
           </div>
           <span
-            className={`text-[11px] font-gujarati font-medium truncate max-w-[140px] xs:max-w-[200px] sm:max-w-xs ${
+            className={`text-[10px] sm:text-[11px] font-gujarati font-medium truncate max-w-[130px] xs:max-w-[180px] sm:max-w-xs ${
               isLight ? 'text-slate-600' : 'text-slate-300'
             }`}
           >
@@ -105,12 +105,12 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
       </div>
 
       {/* Zone 3: Essential Controls (Optimized for Mobile Screens) */}
-      <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+      <div className="flex items-center gap-1 sm:gap-2 shrink-0">
         {/* Notification Settings Button */}
         {onOpenNotificationModal && (
           <button
             onClick={onOpenNotificationModal}
-            className={`p-2 rounded-xl border transition-colors flex items-center justify-center relative shrink-0 ${
+            className={`p-1.5 sm:p-2 rounded-xl border transition-colors flex items-center justify-center relative shrink-0 ${
               isLight
                 ? 'bg-slate-100 hover:bg-slate-200 text-slate-800 border-slate-300'
                 : 'glass-panel text-cyan-300 hover:text-white border-slate-700'
@@ -126,7 +126,7 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
         {/* Theme Toggle (Light / Dark) */}
         <button
           onClick={onToggleTheme}
-          className={`p-2 rounded-xl border transition-colors flex items-center justify-center shrink-0 ${
+          className={`p-1.5 sm:p-2 rounded-xl border transition-colors flex items-center justify-center shrink-0 ${
             isLight
               ? 'bg-slate-100 hover:bg-slate-200 text-slate-800 border-slate-300'
               : 'glass-panel text-amber-300 hover:text-white border-slate-700'

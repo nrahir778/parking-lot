@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { CameraView, SlotData, GateState } from '../types';
 import { Car3D } from './Car3D';
 import {
@@ -6,13 +6,16 @@ import {
   Eye,
   Maximize2,
   Sparkles,
-  Navigation,
-  ShieldCheck,
-  ShieldAlert,
   Radio,
   IndianRupee,
   X,
-  Car,
+  ZoomIn,
+  ZoomOut,
+  RotateCcw,
+  ShieldCheck,
+  CheckCircle2,
+  AlertCircle,
+  Navigation,
 } from 'lucide-react';
 
 interface IsometricParkingLotProps {
@@ -40,59 +43,138 @@ export const IsometricParkingLot: React.FC<IsometricParkingLotProps> = ({
 }) => {
   const [cameraView, setCameraView] = useState<CameraView>('isometric');
   const [showSensorRays, setShowSensorRays] = useState(true);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [containerWidth, setContainerWidth] = useState(700);
+  const [manualZoomMultiplier, setManualZoomMultiplier] = useState(1.0);
 
-  // Monitor container width for responsive scaling
+  const containerRef = useRef<HTMLDivElement>(null);
+  const stageRef = useRef<HTMLDivElement>(null);
+  const [stageDimensions, setStageDimensions] = useState({ width: 700, height: 480 });
+
+  // Measure stage element continuously using ResizeObserver to guarantee auto-fit on ANY screen
   useEffect(() => {
-    const updateWidth = () => {
-      if (containerRef.current) {
-        setContainerWidth(containerRef.current.clientWidth);
+    const el = stageRef.current;
+    if (!el) return;
+
+    const updateBounds = (width: number, height: number) => {
+      if (width > 0 && height > 0) {
+        setStageDimensions({ width, height });
       }
     };
-    updateWidth();
-    window.addEventListener('resize', updateWidth);
-    return () => window.removeEventListener('resize', updateWidth);
+
+    // Initial measurement
+    updateBounds(el.clientWidth, el.clientHeight);
+
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const { width, height } = entry.contentRect;
+        updateBounds(width, height);
+      }
+    });
+
+    observer.observe(el);
+
+    const handleWindowResize = () => {
+      if (el) updateBounds(el.clientWidth, el.clientHeight);
+    };
+    window.addEventListener('resize', handleWindowResize);
+    window.addEventListener('orientationchange', handleWindowResize);
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', handleWindowResize);
+      window.removeEventListener('orientationchange', handleWindowResize);
+    };
   }, [isFullscreen]);
+
+  // Reset zoom multiplier when camera view or fullscreen changes
+  useEffect(() => {
+    setManualZoomMultiplier(1.0);
+  }, [cameraView, isFullscreen]);
 
   const isGateClosed = gateState.angle >= 45 || gateState.status === 'CLOSED';
   const totalOccupied = isConnected ? slots.filter((s) => s.status === 'OCCUPIED').length : 0;
-  const availableCount = Math.max(0, slots.length - totalOccupied);
+  const isAllFull = isConnected && totalOccupied >= slots.length;
 
-  // Dynamic scale factor to guarantee the 3D scene fits inside viewport
-  const sceneScale = useMemo(() => {
-    if (isFullscreen) {
-      const maxW = typeof window !== 'undefined' ? window.innerWidth : 700;
-      const maxH = typeof window !== 'undefined' ? window.innerHeight : 600;
-      return Math.min(1.2, Math.max(0.65, Math.min((maxW - 32) / 600, (maxH - 120) / 480)));
+  /**
+   * MATHEMATICAL AUTO-FIT SCALING ENGINE:
+   * Base dimensions of the 3D parking yard: 520px wide × 360px high.
+   * We calculate the true 2D projected bounding box for each camera perspective,
+   * then fit BOTH width AND height into available viewport space with zero cut-off.
+   */
+  const autoFitScale = useMemo(() => {
+    let safeProjectedWidth = 620;
+    let safeProjectedHeight = 410;
+
+    if (cameraView === 'topdown') {
+      safeProjectedWidth = 530;
+      safeProjectedHeight = 370;
+    } else if (cameraView === 'driver') {
+      safeProjectedWidth = 580;
+      safeProjectedHeight = 400;
     }
-    if (containerWidth < 360) return 0.54;
-    if (containerWidth < 420) return 0.62;
-    if (containerWidth < 500) return 0.72;
-    if (containerWidth < 640) return 0.82;
-    if (containerWidth < 768) return 0.92;
-    return 1.0;
-  }, [containerWidth, isFullscreen]);
+
+    // Usable stage space with safe clearance margins
+    const availableWidth = Math.max(180, stageDimensions.width - 20);
+    const availableHeight = Math.max(220, stageDimensions.height > 50 ? stageDimensions.height - 16 : 320);
+
+    const scaleFactorX = availableWidth / safeProjectedWidth;
+    const scaleFactorY = availableHeight / safeProjectedHeight;
+
+    // Constrain to the tighter axis so it NEVER clips or cuts off
+    const fitScale = Math.min(scaleFactorX, scaleFactorY);
+
+    // Floor at 0.40 for narrow mobile screens; allows up to 1.70 on large monitors
+    return Math.max(0.4, Math.min(1.7, fitScale));
+  }, [stageDimensions, cameraView]);
+
+  // Combined scale incorporating user manual zoom
+  const currentScale = useMemo(() => {
+    return Number((autoFitScale * manualZoomMultiplier).toFixed(3));
+  }, [autoFitScale, manualZoomMultiplier]);
+
+  const handleZoomIn = useCallback(() => {
+    setManualZoomMultiplier((prev) => Math.min(1.8, Number((prev + 0.15).toFixed(2))));
+  }, []);
+
+  const handleZoomOut = useCallback(() => {
+    setManualZoomMultiplier((prev) => Math.max(0.65, Number((prev - 0.15).toFixed(2))));
+  }, []);
+
+  const handleResetZoom = useCallback(() => {
+    setManualZoomMultiplier(1.0);
+  }, []);
+
+  // Camera 3D angles
+  const cameraTransform = useMemo(() => {
+    switch (cameraView) {
+      case 'topdown':
+        return 'rotateX(0deg) rotateZ(0deg)';
+      case 'driver':
+        return 'rotateX(58deg) rotateZ(-10deg)';
+      case 'isometric':
+      default:
+        return 'rotateX(46deg) rotateZ(-22deg)';
+    }
+  }, [cameraView]);
 
   return (
     <div
       ref={containerRef}
-      className={`relative w-full overflow-hidden transition-all duration-300 flex flex-col items-center justify-between select-none ${
+      className={`relative w-full overflow-hidden transition-all duration-300 flex flex-col items-center justify-start select-none ${
         isFullscreen
-          ? 'fixed inset-0 z-50 w-screen h-screen rounded-none border-none shadow-none pt-[max(3.6rem,calc(env(safe-area-inset-top,28px)+2.8rem))] pb-3'
-          : 'h-[400px] sm:h-[480px] lg:h-[540px] rounded-3xl border shadow-xl p-2 sm:p-4'
+          ? 'fixed inset-0 z-[100] w-screen h-screen rounded-none border-none shadow-none pt-[max(0.6rem,env(safe-area-inset-top,16px))] pb-2 px-2 sm:px-4'
+          : 'h-auto min-h-[350px] sm:min-h-[420px] rounded-3xl border shadow-xl p-2.5 sm:p-4'
       } ${
         isLightMode
-          ? 'bg-gradient-to-b from-slate-100 via-sky-50 to-slate-200 border-slate-300/80 shadow-slate-300/40'
-          : 'bg-gradient-to-b from-[#0b0f19] via-[#080c14] to-[#04070d] border-slate-800 shadow-[0_20px_50px_rgba(0,0,0,0.8)]'
+          ? 'bg-gradient-to-b from-slate-100 via-sky-50/60 to-slate-200 border-slate-300 shadow-slate-300/40'
+          : 'bg-gradient-to-b from-[#0b0f19] via-[#080c14] to-[#04070d] border-slate-800 shadow-[0_20px_50px_rgba(0,0,0,0.85)]'
       }`}
     >
-      {/* Background Architectural Grid Pattern */}
+      {/* Background Architectural Subtle Grid */}
       <div
-        className={`absolute inset-0 pointer-events-none bg-[size:32px_32px] ${
+        className={`absolute inset-0 pointer-events-none bg-[size:28px_28px] ${
           isLightMode
-            ? 'bg-[linear-gradient(to_right,#00000006_1px,transparent_1px),linear-gradient(to_bottom,#00000006_1px,transparent_1px)]'
-            : 'bg-[linear-gradient(to_right,#38bdf805_1px,transparent_1px),linear-gradient(to_bottom,#38bdf805_1px,transparent_1px)]'
+            ? 'bg-[linear-gradient(to_right,#00000007_1px,transparent_1px),linear-gradient(to_bottom,#00000007_1px,transparent_1px)]'
+            : 'bg-[linear-gradient(to_right,#38bdf806_1px,transparent_1px),linear-gradient(to_bottom,#38bdf806_1px,transparent_1px)]'
         }`}
       />
 
@@ -100,55 +182,63 @@ export const IsometricParkingLot: React.FC<IsometricParkingLotProps> = ({
       <div
         className={`${
           isFullscreen
-            ? 'fixed top-0 inset-x-0 z-50 pt-[max(0.5rem,env(safe-area-inset-top,24px))] pb-2 px-3 sm:px-6 bg-slate-950/90 backdrop-blur-xl border-b border-white/10 shadow-md'
+            ? 'w-full z-30 pt-1 pb-2 px-1 sm:px-3 bg-slate-950/80 backdrop-blur-xl border-b border-white/10 rounded-2xl'
             : 'w-full z-30'
-        } flex items-center justify-between gap-2 pointer-events-auto`}
+        } flex items-center justify-between gap-1.5 sm:gap-2 pointer-events-auto`}
       >
-        {/* Left: Minimalist Status Indicator */}
-        <div className="flex items-center gap-2">
+        {/* Left: Minimalist Status Pill with Stacked Title & Standby */}
+        <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 shrink-0">
           <div
-            className={`px-3 py-1.5 rounded-full flex items-center gap-2 text-xs font-medium border shadow-xs backdrop-blur-md transition-all ${
+            className={`px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-2xl flex items-center gap-2 border shadow-xs backdrop-blur-md transition-all shrink-0 ${
               isLightMode && !isFullscreen
-                ? 'bg-white/95 text-slate-800 border-slate-300'
-                : 'glass-panel text-slate-200 border-slate-700/80'
+                ? 'bg-white/95 text-slate-800 border-slate-300 shadow-slate-200'
+                : 'glass-panel text-slate-200 border-slate-700/80 shadow-black/40'
             }`}
           >
             <span
-              className={`w-2 h-2 rounded-full ${
+              className={`w-2 h-2 rounded-full shrink-0 ${
                 isConnected
-                  ? 'bg-emerald-500 animate-pulse shadow-[0_0_8px_#10b981]'
+                  ? isAllFull
+                    ? 'bg-rose-500 animate-ping'
+                    : 'bg-emerald-500 animate-pulse shadow-[0_0_8px_#10b981]'
                   : 'bg-slate-400'
               }`}
             />
-            <span className="font-semibold tracking-tight text-xs sm:text-sm">
-              Lakhapar Parking Area
-            </span>
-            <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-md bg-slate-900 text-cyan-300 border border-cyan-500/30 tabular-nums">
-              {isConnected ? `${totalOccupied}/3 Occupied` : 'Standby'}
-            </span>
-          </div>
-
-          <div className="hidden xs:flex px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/25 text-amber-600 dark:text-amber-300 font-mono text-xs font-semibold items-center gap-1">
-            <IndianRupee className="w-3 h-3" />
-            <span>₹10/min</span>
+            <div className="flex flex-col items-start leading-tight min-w-0">
+              <span className="font-bold tracking-tight text-xs sm:text-sm whitespace-nowrap text-slate-900 dark:text-white">
+                Lakhapar Parking Area
+              </span>
+              <span
+                className={`text-[10px] font-mono font-semibold tabular-nums ${
+                  isConnected
+                    ? isAllFull
+                      ? 'text-rose-600 dark:text-rose-400 font-bold'
+                      : 'text-emerald-600 dark:text-emerald-400 font-bold'
+                    : 'text-cyan-600 dark:text-cyan-300'
+                }`}
+              >
+                {isConnected ? (isAllFull ? '3/3 Occupied' : `${totalOccupied}/3 Occupied`) : 'Standby'}
+              </span>
+            </div>
           </div>
         </div>
 
-        {/* Right: Camera Switcher & Fullscreen Button */}
-        <div className="flex items-center gap-1.5 shrink-0">
+        {/* Right: Camera Switcher, Auto-Fit/Zoom, Fullscreen */}
+        <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
+          {/* Camera View Switcher (3D and Top) */}
           <div
-            className={`flex items-center gap-0.5 p-0.5 rounded-full border shadow-xs backdrop-blur-md ${
+            className={`flex items-center gap-0.5 p-0.5 rounded-full border shadow-xs backdrop-blur-md shrink-0 ${
               isLightMode && !isFullscreen ? 'bg-white/95 border-slate-300' : 'glass-panel border-slate-700/80'
             }`}
           >
             <button
               onClick={() => setCameraView('isometric')}
-              className={`px-2.5 py-1 text-xs font-medium rounded-full transition-all flex items-center gap-1 ${
+              className={`px-2 sm:px-2.5 py-1 text-xs font-medium rounded-full transition-all flex items-center gap-1 ${
                 cameraView === 'isometric'
                   ? 'bg-cyan-600 text-white font-semibold shadow-xs'
                   : 'text-slate-400 hover:text-slate-200'
               }`}
-              title="3D View"
+              title="Isometric 3D View"
             >
               <Compass className="w-3 h-3" />
               <span>3D</span>
@@ -156,33 +246,87 @@ export const IsometricParkingLot: React.FC<IsometricParkingLotProps> = ({
 
             <button
               onClick={() => setCameraView('topdown')}
-              className={`px-2.5 py-1 text-xs font-medium rounded-full transition-all flex items-center gap-1 ${
+              className={`px-2 sm:px-2.5 py-1 text-xs font-medium rounded-full transition-all flex items-center gap-1 ${
                 cameraView === 'topdown'
                   ? 'bg-cyan-600 text-white font-semibold shadow-xs'
                   : 'text-slate-400 hover:text-slate-200'
               }`}
-              title="Top View"
+              title="Top Blueprint View"
             >
               <Eye className="w-3 h-3" />
               <span>Top</span>
             </button>
 
             <button
-              onClick={() => setShowSensorRays(!showSensorRays)}
-              className={`p-1.5 rounded-full transition-colors flex items-center justify-center ${
-                showSensorRays ? 'text-cyan-400 bg-cyan-500/15' : 'text-slate-400 hover:text-slate-200'
+              onClick={() => setCameraView('driver')}
+              className={`hidden md:flex px-2 py-1 text-xs font-medium rounded-full transition-all items-center gap-1 ${
+                cameraView === 'driver'
+                  ? 'bg-cyan-600 text-white font-semibold shadow-xs'
+                  : 'text-slate-400 hover:text-slate-200'
               }`}
-              title="Toggle Sensor Beams"
+              title="Driver Street View"
             >
-              <Sparkles className="w-3.5 h-3.5" />
+              <Navigation className="w-3 h-3" />
+              <span>Street</span>
             </button>
           </div>
 
+          {/* Interactive Zoom Controls & Auto-Fit (Visible on larger screens or compact) */}
+          <div
+            className={`hidden sm:flex items-center gap-0.5 p-0.5 rounded-full border shadow-xs backdrop-blur-md shrink-0 ${
+              isLightMode && !isFullscreen ? 'bg-white/95 border-slate-300' : 'glass-panel border-slate-700/80'
+            }`}
+          >
+            <button
+              onClick={handleZoomOut}
+              className="p-1 rounded-full text-slate-400 hover:text-slate-200 active:scale-90 transition-all"
+              title="Zoom Out"
+            >
+              <ZoomOut className="w-3.5 h-3.5" />
+            </button>
+
+            <button
+              onClick={handleResetZoom}
+              className={`px-1.5 py-0.5 text-[10px] font-mono font-bold rounded-full transition-all ${
+                manualZoomMultiplier !== 1.0
+                  ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/40'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+              title="Reset Auto-Fit to Display"
+            >
+              {manualZoomMultiplier === 1.0 ? 'Fit' : `${Math.round(manualZoomMultiplier * 100)}%`}
+            </button>
+
+            <button
+              onClick={handleZoomIn}
+              className="p-1 rounded-full text-slate-400 hover:text-slate-200 active:scale-90 transition-all"
+              title="Zoom In"
+            >
+              <ZoomIn className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          {/* Ultrasonic Sensor Beam Toggle */}
+          <button
+            onClick={() => setShowSensorRays((prev) => !prev)}
+            className={`p-1.5 rounded-full border transition-colors shrink-0 ${
+              showSensorRays
+                ? 'text-cyan-400 bg-cyan-500/20 border-cyan-500/40'
+                : 'text-slate-400 hover:text-slate-200 border-transparent'
+            }`}
+            title="Toggle Sensor Beams"
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+          </button>
+
+          {/* Fullscreen / Maximize Toggle (Guaranteed Never Cut Off) */}
           <button
             onClick={() => onToggleFullscreen && onToggleFullscreen(!isFullscreen)}
-            className={`p-2 rounded-full border transition-all active:scale-95 cursor-pointer ${
+            className={`p-1.5 sm:p-2 rounded-full border transition-all active:scale-95 cursor-pointer shadow-xs shrink-0 ${
               isFullscreen
-                ? 'bg-rose-600 text-white border-rose-400 shadow-md'
+                ? 'bg-rose-600 text-white border-rose-400 hover:bg-rose-500'
+                : isLightMode
+                ? 'bg-white hover:bg-slate-100 text-slate-700 border-slate-300'
                 : 'bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-400 border-cyan-500/40'
             }`}
             title={isFullscreen ? 'Exit Full Screen' : 'Full Screen'}
@@ -192,56 +336,70 @@ export const IsometricParkingLot: React.FC<IsometricParkingLotProps> = ({
         </div>
       </div>
 
-      {/* 3D PARKING YARD SCENE CONTAINER */}
-      <div className="w-full flex-1 flex items-center justify-center overflow-visible perspective-1600 select-none py-1">
+      {/* 3D PARKING YARD SCENE CONTAINER - UPPER ALIGNED & RESIZES TO FIT */}
+      <div
+        ref={stageRef}
+        className={`w-full flex items-center justify-center overflow-visible perspective-1600 select-none relative pt-1 sm:pt-2 pb-2 ${
+          isFullscreen
+            ? 'flex-1 mt-2 sm:mt-4 min-h-[360px]'
+            : 'mt-1 sm:mt-2 h-[290px] xs:h-[320px] sm:h-[370px] md:h-[420px]'
+        }`}
+      >
         <div
-          className={`parking-scene preserve-3d transition-transform duration-700 ease-out origin-center`}
+          className="parking-scene preserve-3d transition-transform duration-500 ease-out origin-center"
           style={{
-            transform: `${
-              cameraView === 'isometric'
-                ? `rotateX(48deg) rotateZ(-22deg) scale(${sceneScale})`
-                : cameraView === 'topdown'
-                ? `rotateX(0deg) rotateZ(0deg) scale(${sceneScale * 0.95})`
-                : `rotateX(62deg) rotateZ(-12deg) scale(${sceneScale * 1.05})`
-            }`,
+            transform: `${cameraTransform} scale(${currentScale})`,
           }}
         >
-          {/* ARCHITECTURAL PLATFORM FOUNDATION */}
+          {/* ARCHITECTURAL PLATFORM FOUNDATION (520px x 360px) */}
           <div
-            className="relative w-[560px] rounded-3xl border-2 preserve-3d flex flex-col items-center shadow-2xl overflow-hidden transition-all duration-500"
+            className="relative w-[520px] rounded-3xl border-2 preserve-3d flex flex-col items-center shadow-2xl overflow-hidden transition-all duration-300"
             style={{
               background: isLightMode
                 ? 'linear-gradient(180deg, #475569 0%, #334155 100%)'
-                : 'linear-gradient(180deg, #161e2e 0%, #0d131f 100%)',
+                : 'linear-gradient(180deg, #182232 0%, #0d1420 100%)',
               borderColor: isLightMode ? '#94a3b8' : '#334155',
               boxShadow: isLightMode
-                ? '0 30px 60px -15px rgba(51, 65, 85, 0.5), inset 0 2px 4px rgba(255,255,255,0.4)'
+                ? '0 30px 60px -15px rgba(51, 65, 85, 0.45), inset 0 2px 4px rgba(255,255,255,0.4)'
                 : '0 35px 70px -15px rgba(0, 0, 0, 0.95), inset 0 2px 4px rgba(255,255,255,0.08)',
               transform: 'translateZ(0px)',
             }}
           >
-            {/* 1. TOP MARQUEE: ONLY "Lakhapar Parking Area" */}
+            {/* 1. TOP MARQUEE: ONLY "Lakhapar Parking Area" IN ENGLISH AND GUJARATI */}
             <div
               className={`w-full py-2.5 px-6 border-b flex items-center justify-between ${
                 isLightMode
                   ? 'bg-slate-900 border-slate-700 text-white'
-                  : 'bg-black/80 border-white/10 text-white'
+                  : 'bg-black/85 border-white/10 text-white'
               }`}
             >
               <div className="flex items-center gap-2.5">
-                <div className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse shadow-[0_0_8px_#38bdf8]" />
-                <h2 className="text-base sm:text-lg font-black tracking-wider text-white uppercase font-sans">
-                  Lakhapar Parking Area
-                </h2>
+                <div className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse shadow-[0_0_10px_#38bdf8]" />
+                <div className="flex flex-col">
+                  <h2 className="text-base sm:text-lg font-black tracking-wider text-white uppercase font-sans leading-tight">
+                    Lakhapar Parking Area
+                  </h2>
+                  <span className="text-xs sm:text-sm font-gujarati font-bold text-amber-300 tracking-wide leading-tight">
+                    લાખાપર પાર્કિંગ વિસ્તાર
+                  </span>
+                </div>
               </div>
-              <div className="flex items-center gap-2 text-xs font-mono text-cyan-300">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                <span>3-Bay Smart Facility</span>
+
+              {/* Minimalist Live Status Indicator */}
+              <div className="flex items-center gap-2">
+                <span
+                  className={`w-2 h-2 rounded-full ${
+                    isConnected ? 'bg-emerald-400 animate-ping' : 'bg-slate-400'
+                  }`}
+                />
+                <span className="text-xs font-mono font-bold text-cyan-300 uppercase">
+                  {isConnected ? (isAllFull ? 'FULL' : 'ACTIVE') : 'STANDBY'}
+                </span>
               </div>
             </div>
 
             {/* 2. THE 3 PARKING BAYS WITH LANDSCAPED GRASS MEDIANS */}
-            <div className="w-full px-5 py-4 flex items-center justify-between gap-3 preserve-3d">
+            <div className="w-full px-5 py-3 flex items-center justify-between gap-3 preserve-3d">
               {slots.map((slot, index) => {
                 const isOccupied = isConnected && slot.status === 'OCCUPIED';
                 const isEmpty = isConnected && (slot.status === 'EMPTY' || slot.status === 'AVAILABLE');
@@ -252,14 +410,14 @@ export const IsometricParkingLot: React.FC<IsometricParkingLotProps> = ({
                     {/* Landscaped Green Grass Median Between Bays */}
                     {index > 0 && (
                       <div
-                        className="flex-none w-4 h-64 rounded-xl border border-slate-500/40 bg-slate-800/80 p-0.5 shadow-sm flex flex-col items-center justify-between py-2 preserve-3d"
+                        className="flex-none w-3.5 h-56 rounded-xl border border-slate-500/40 bg-slate-800/80 p-0.5 shadow-sm flex flex-col items-center justify-between py-2 preserve-3d"
                         style={{ transform: 'translateZ(3px)' }}
-                        title="Grass median divider"
+                        title="Landscaped Grass Divider"
                       >
                         <div className="w-full h-full rounded-lg grass-divider-texture flex flex-col items-center justify-between py-2 shadow-inner">
-                          <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 border border-emerald-300 shadow-xs" />
+                          <div className="w-2 h-2 rounded-full bg-emerald-400 border border-emerald-300 shadow-xs" />
                           <div className="w-1.5 h-1.5 rounded-full bg-amber-300 shadow-[0_0_6px_#fde047] animate-pulse" />
-                          <div className="w-2.5 h-2.5 rounded-full bg-emerald-600 border border-emerald-400 shadow-xs" />
+                          <div className="w-2 h-2 rounded-full bg-emerald-500 border border-emerald-300 shadow-xs" />
                         </div>
                       </div>
                     )}
@@ -267,11 +425,11 @@ export const IsometricParkingLot: React.FC<IsometricParkingLotProps> = ({
                     {/* PARKING BAY STALL */}
                     <div
                       onClick={() => onSlotClick && onSlotClick(slot.id)}
-                      className={`relative flex-1 h-64 rounded-2xl border-2 p-2 flex flex-col items-center justify-between transition-all duration-300 cursor-pointer preserve-3d ${
+                      className={`relative flex-1 h-56 rounded-2xl border-2 p-2 flex flex-col items-center justify-between transition-all duration-300 cursor-pointer preserve-3d ${
                         isOccupied
-                          ? 'border-rose-500/90 bg-rose-950/30 shadow-[0_0_20px_rgba(244,63,94,0.35)]'
+                          ? 'border-rose-500/90 bg-rose-950/25 shadow-[0_0_20px_rgba(244,63,94,0.3)]'
                           : isEmpty
-                          ? 'border-emerald-500/90 bg-emerald-950/25 shadow-[0_0_20px_rgba(16,185,129,0.3)]'
+                          ? 'border-emerald-500/90 bg-emerald-950/20 shadow-[0_0_20px_rgba(16,185,129,0.25)]'
                           : isLightMode
                           ? 'border-slate-400/80 bg-slate-800/30'
                           : 'border-slate-700 bg-slate-900/40'
@@ -281,16 +439,14 @@ export const IsometricParkingLot: React.FC<IsometricParkingLotProps> = ({
                           : ''
                       }`}
                     >
-                      {/* Top Bay Header: Slot ID & Status Light */}
+                      {/* Top Bay Header: Slot ID & Minimalist Ultrasonic Sensor */}
                       <div className="w-full flex items-center justify-between z-20">
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-xs font-mono font-black text-white bg-black/80 px-2 py-0.5 rounded-md border border-white/20">
-                            LOT {slot.id}
-                          </span>
-                        </div>
+                        <span className="text-xs font-mono font-black text-white bg-black/80 px-2 py-0.5 rounded-md border border-white/20">
+                          LOT {slot.id}
+                        </span>
 
-                        {/* Minimalist Smart Sensor Status Indicator */}
-                        <div className="flex items-center gap-1.5">
+                        {/* Minimalist Smart Ultrasonic Sensor Status Light */}
+                        <div className="flex items-center gap-1">
                           <div
                             className={`w-3.5 h-3.5 rounded-full border-2 transition-all duration-300 ${
                               isOccupied
@@ -316,8 +472,8 @@ export const IsometricParkingLot: React.FC<IsometricParkingLotProps> = ({
                         />
                       )}
 
-                      {/* Central Vehicle Area: Realistic Car or Clean Empty Graphic */}
-                      <div className="relative w-full flex-1 flex items-center justify-center my-1 preserve-3d">
+                      {/* Central Vehicle Area: 3D Car or Clean Minimalist Empty Stall */}
+                      <div className="relative w-full flex-1 flex items-center justify-center my-0.5 preserve-3d">
                         {isOccupied ? (
                           <Car3D
                             car={slot.car}
@@ -327,16 +483,16 @@ export const IsometricParkingLot: React.FC<IsometricParkingLotProps> = ({
                             isLightMode={isLightMode}
                           />
                         ) : (
-                          <div className="flex flex-col items-center justify-center gap-1.5 pointer-events-none">
+                          <div className="flex flex-col items-center justify-center gap-1 pointer-events-none">
                             <div
-                              className={`w-14 h-14 rounded-2xl border-2 border-dashed flex flex-col items-center justify-center ${
+                              className={`w-12 h-12 rounded-xl border-2 border-dashed flex flex-col items-center justify-center ${
                                 isEmpty
                                   ? 'border-emerald-400/80 bg-emerald-500/10'
                                   : 'border-slate-500/60 bg-slate-500/10'
                               }`}
                             >
                               <span
-                                className={`text-2xl font-mono font-black ${
+                                className={`text-xl font-mono font-black ${
                                   isEmpty ? 'text-emerald-400' : 'text-slate-400'
                                 }`}
                               >
@@ -344,7 +500,7 @@ export const IsometricParkingLot: React.FC<IsometricParkingLotProps> = ({
                               </span>
                             </div>
                             <span
-                              className={`text-[10px] font-mono tracking-widest font-bold uppercase ${
+                              className={`text-[9px] font-mono tracking-widest font-bold uppercase ${
                                 isEmpty ? 'text-emerald-400' : 'text-slate-400'
                               }`}
                             >
@@ -354,14 +510,14 @@ export const IsometricParkingLot: React.FC<IsometricParkingLotProps> = ({
                         )}
                       </div>
 
-                      {/* Minimalist Rubber Wheel Stop Curb */}
+                      {/* Rubber Wheel Stop Curb */}
                       <div
-                        className="w-20 h-2 rounded-xs bg-neutral-950 border border-slate-600 shadow-md mb-1 z-20 rumble-strip"
+                        className="w-18 h-1.5 rounded-xs bg-neutral-950 border border-slate-600 shadow-md mb-1 z-20 rumble-strip"
                         style={{ transform: 'translateZ(3px)' }}
                       />
 
                       {/* Bottom Live Telemetry & Charge Badge */}
-                      <div className="w-full flex items-center justify-between px-2 py-1 text-[10px] font-mono text-slate-200 bg-black/85 rounded-lg border border-white/10 z-20">
+                      <div className="w-full flex items-center justify-between px-2 py-0.5 text-[9px] font-mono text-slate-200 bg-black/85 rounded-lg border border-white/10 z-20">
                         <span className="tabular-nums flex items-center gap-1">
                           <Radio className="w-2.5 h-2.5 text-cyan-400" />
                           {slot.hasHardwareReading && isConnected
@@ -387,7 +543,7 @@ export const IsometricParkingLot: React.FC<IsometricParkingLotProps> = ({
 
             {/* 3. CIRCULATION DRIVEWAY WITH WHITE ROAD STRIPES */}
             <div
-              className={`w-full py-2.5 px-6 border-t-2 border-b-2 flex items-center justify-between relative overflow-hidden ${
+              className={`w-full py-2 px-6 border-t-2 border-b-2 flex items-center justify-between relative overflow-hidden ${
                 isLightMode ? 'bg-slate-700 border-white/60' : 'bg-[#101724] border-white/40'
               }`}
             >
@@ -396,26 +552,26 @@ export const IsometricParkingLot: React.FC<IsometricParkingLotProps> = ({
 
               {/* Bay Directional Guide Arrows */}
               <div className="flex items-center gap-6 z-10">
-                <div className="flex items-center gap-1 text-white font-mono text-[10px] font-bold bg-black/80 px-2 py-0.5 rounded-md border border-white/20">
+                <div className="flex items-center gap-1 text-white font-mono text-[9px] font-bold bg-black/80 px-2 py-0.5 rounded-md border border-white/20">
                   <span className="text-yellow-400 text-xs">⬆</span>
                   <span>BAY 1</span>
                 </div>
-                <div className="flex items-center gap-1 text-white font-mono text-[10px] font-bold bg-black/80 px-2 py-0.5 rounded-md border border-white/20">
+                <div className="flex items-center gap-1 text-white font-mono text-[9px] font-bold bg-black/80 px-2 py-0.5 rounded-md border border-white/20">
                   <span className="text-yellow-400 text-xs">⬆</span>
                   <span>BAY 2</span>
                 </div>
-                <div className="flex items-center gap-1 text-white font-mono text-[10px] font-bold bg-black/80 px-2 py-0.5 rounded-md border border-white/20">
+                <div className="flex items-center gap-1 text-white font-mono text-[9px] font-bold bg-black/80 px-2 py-0.5 rounded-md border border-white/20">
                   <span className="text-yellow-400 text-xs">⬆</span>
                   <span>BAY 3</span>
                 </div>
               </div>
 
-              {/* Drive Aisle Indicator */}
+              {/* Drive Aisle Speed & Direction */}
               <div className="flex items-center gap-2 z-10">
-                <div className="w-6 h-6 rounded-full border-2 border-red-500 bg-white flex items-center justify-center shadow-xs">
-                  <span className="text-black font-black text-[9px] font-sans">10</span>
+                <div className="w-5 h-5 rounded-full border-2 border-red-500 bg-white flex items-center justify-center shadow-xs">
+                  <span className="text-black font-black text-[8px] font-sans">10</span>
                 </div>
-                <div className="flex items-center gap-1 text-white font-mono text-[10px] font-bold bg-black/80 px-2 py-0.5 rounded-md border border-white/20">
+                <div className="flex items-center gap-1 text-white font-mono text-[9px] font-bold bg-black/80 px-2 py-0.5 rounded-md border border-white/20">
                   <span>ONE-WAY</span>
                   <span className="text-yellow-400 text-xs">➔</span>
                 </div>
@@ -424,7 +580,7 @@ export const IsometricParkingLot: React.FC<IsometricParkingLotProps> = ({
 
             {/* 4. ENTRANCE GATE & MG995 BOOM BARRIER */}
             <div
-              className={`w-full py-2.5 px-6 flex items-center justify-between relative overflow-hidden ${
+              className={`w-full py-2 px-6 flex items-center justify-between relative overflow-hidden ${
                 isLightMode ? 'bg-slate-800' : 'bg-black/90'
               }`}
             >
@@ -434,15 +590,15 @@ export const IsometricParkingLot: React.FC<IsometricParkingLotProps> = ({
               {/* Barrier Gate & Servo Mechanism */}
               <div className="flex items-center gap-3 z-10">
                 {/* Security Gate Tower */}
-                <div className="w-8 h-8 rounded-lg bg-slate-800 border border-slate-600 shadow-md flex items-center justify-center text-cyan-300">
-                  <ShieldCheck className="w-4 h-4" />
+                <div className="w-7 h-7 rounded-lg bg-slate-800 border border-slate-600 shadow-md flex items-center justify-center text-cyan-300">
+                  <ShieldCheck className="w-3.5 h-3.5" />
                 </div>
 
                 {/* Servo Actuator */}
-                <div className="relative w-6 h-8 rounded-md bg-amber-500 border border-neutral-900 shadow-md flex flex-col items-center justify-between py-1">
-                  <span className="text-[6px] font-mono font-black text-black">MG995</span>
+                <div className="relative w-5 h-7 rounded-md bg-amber-500 border border-neutral-900 shadow-md flex flex-col items-center justify-between py-1">
+                  <span className="text-[5px] font-mono font-black text-black">MG995</span>
                   <div
-                    className={`w-2.5 h-2.5 rounded-full border border-white ${
+                    className={`w-2 h-2 rounded-full border border-white ${
                       isGateClosed
                         ? 'bg-red-600 shadow-[0_0_6px_#ef4444]'
                         : 'bg-emerald-500 shadow-[0_0_6px_#10b981]'
@@ -451,7 +607,7 @@ export const IsometricParkingLot: React.FC<IsometricParkingLotProps> = ({
                 </div>
 
                 {/* Boom Barrier Arm */}
-                <div className="relative w-28 h-2 bg-white rounded-r border border-slate-700 shadow-md overflow-hidden curb-hazard transition-all duration-500">
+                <div className="relative w-24 h-2 bg-white rounded-r border border-slate-700 shadow-md overflow-hidden curb-hazard transition-all duration-500">
                   <div
                     className={`absolute inset-0 bg-red-600/40 transition-opacity duration-300 ${
                       isGateClosed ? 'opacity-100' : 'opacity-0'
@@ -460,7 +616,7 @@ export const IsometricParkingLot: React.FC<IsometricParkingLotProps> = ({
                 </div>
 
                 <span
-                  className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-md border uppercase ${
+                  className={`text-[9px] font-mono font-bold px-2 py-0.5 rounded-md border uppercase ${
                     isGateClosed
                       ? 'bg-rose-500/20 text-rose-400 border-rose-500/40'
                       : 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40'
@@ -472,13 +628,13 @@ export const IsometricParkingLot: React.FC<IsometricParkingLotProps> = ({
 
               {/* Pedestrian Zebra Crosswalk Strips */}
               <div
-                className="w-16 h-6 white-crosswalk-stripes opacity-90 rounded-xs border-x border-white/40 z-10 shadow-xs hidden sm:block"
+                className="w-14 h-5 white-crosswalk-stripes opacity-90 rounded-xs border-x border-white/40 z-10 shadow-xs hidden sm:block"
                 title="Pedestrian Crosswalk"
               />
 
-              {/* Clean Entrance Status */}
-              <div className="flex items-center gap-2 text-xs font-mono text-slate-300 z-10">
-                <span className="text-emerald-400 font-bold">ENTRY / EXIT</span>
+              {/* Clean Status */}
+              <div className="flex items-center gap-1.5 text-xs font-mono text-slate-300 z-10">
+                <span className="text-emerald-400 font-bold text-[10px]">ENTRY / EXIT</span>
               </div>
             </div>
           </div>

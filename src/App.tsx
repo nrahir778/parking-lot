@@ -627,6 +627,25 @@ export default function App() {
       {/* In-App Live Notification Toast HUD */}
       <InAppToastContainer isLightMode={isLight} />
 
+      {/* Dedicated True Fullscreen View for 3D Parking Yard (Covers entire screen with zero background bleed) */}
+      {isParkingLotFullscreen && (
+        <div className="fixed inset-0 z-[100] w-screen h-screen overflow-hidden bg-[#080c14] flex flex-col items-center justify-start">
+          <IsometricParkingLot
+            slots={slots}
+            gateState={gateState}
+            hardwareBuzzerOn={buzzerState.hardwareBuzzerOn}
+            onSlotClick={(id) => {
+              setSelectedSlotId(id);
+            }}
+            selectedSlotId={selectedSlotId}
+            isLightMode={isLight}
+            isFullscreen={true}
+            onToggleFullscreen={(val) => setIsParkingLotFullscreen(val)}
+            isConnected={isConnected}
+          />
+        </div>
+      )}
+
       {/* Main Container - Optimized Spacing for Mobile Screens */}
       <main className="flex-1 w-full max-w-7xl mx-auto px-2.5 sm:px-6 md:px-8 py-3 sm:py-6 space-y-3 sm:space-y-5">
         {/* Top Summary Bar (2x2 Grid on Mobile) */}
@@ -653,7 +672,7 @@ export default function App() {
           }}
           selectedSlotId={selectedSlotId}
           isLightMode={isLight}
-          isFullscreen={isParkingLotFullscreen}
+          isFullscreen={false}
           onToggleFullscreen={(val) => setIsParkingLotFullscreen(val)}
           isConnected={isConnected}
         />
